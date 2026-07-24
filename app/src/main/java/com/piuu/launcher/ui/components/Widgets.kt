@@ -421,18 +421,11 @@ fun PredictiveSuggestionsWidgetComposable(
                                 .background(PrimaryBlue.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = when(app.icon_name) {
-                                    "phone" -> Icons.Default.Phone
-                                    "message" -> Icons.Default.Message
-                                    "globe" -> Icons.Default.Public
-                                    "camera" -> Icons.Default.CameraAlt
-                                    "brain" -> Icons.Default.AutoAwesome
-                                    else -> Icons.Default.Apps
-                                },
-                                contentDescription = app.name,
-                                tint = PrimaryBlue,
-                                modifier = Modifier.size(20.dp)
+                            com.piuu.launcher.repository.AppIconImage(
+                                packageName = app.package_name,
+                                modifier = Modifier.size(20.dp),
+                                fallbackIconName = app.icon_name,
+                                tintColor = PrimaryBlue
                             )
                         }
                         Spacer(modifier = Modifier.height(4.dp))

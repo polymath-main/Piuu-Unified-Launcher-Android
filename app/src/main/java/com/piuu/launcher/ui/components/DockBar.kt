@@ -86,18 +86,11 @@ fun DockIconItem(app: SystemApp, onClick: () -> Unit) {
                 .clickable { onClick() },
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = when(app.icon_name) {
-                    "phone" -> Icons.Default.Phone
-                    "message" -> Icons.Default.Message
-                    "globe" -> Icons.Default.Public
-                    "camera" -> Icons.Default.CameraAlt
-                    "brain" -> Icons.Default.AutoAwesome
-                    else -> Icons.Default.Apps
-                },
-                contentDescription = app.name,
-                tint = if (app.icon_name == "brain") AccentPurple else Color.White,
-                modifier = Modifier.size(24.dp)
+            com.piuu.launcher.repository.AppIconImage(
+                packageName = app.package_name,
+                modifier = Modifier.size(24.dp),
+                fallbackIconName = app.icon_name,
+                tintColor = if (app.icon_name == "brain") AccentPurple else Color.White
             )
         }
     }

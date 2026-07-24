@@ -99,7 +99,15 @@ fun BrainChatSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Messages List
+            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+            LaunchedEffect(chatMessages.size) {
+                if (chatMessages.isNotEmpty()) {
+                    listState.animateScrollToItem(chatMessages.size - 1)
+                }
+            }
+
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),

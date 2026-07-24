@@ -9,6 +9,12 @@ import android.graphics.drawable.Drawable
 import android.os.Build
 import android.util.Base64
 import android.util.LruCache
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -26,7 +32,7 @@ class UniversalIconLoader(private val context: Context) {
         val cacheKey = "$packageName/$activityName"
         memoryCache.get(cacheKey)?.let { return@withContext it }
 
-        val iconBitmap = resolveBitmap(packageName, activityName)
+        val iconBitmap = resolveBitmap(packageName, activityName) ?: throw Exception("Icon not found for $packageName")
         val scaled = Bitmap.createScaledBitmap(iconBitmap, 128, 128, true)
         if (scaled != iconBitmap && !iconBitmap.isRecycled) {
             iconBitmap.recycle()
@@ -49,7 +55,7 @@ class UniversalIconLoader(private val context: Context) {
         base64Str
     }
 
-    private fun resolveBitmap(packageName: String, activityName: String?): Bitmap {
+    private fun resolveBitmap(packageName: String, activityName: String?): Bitmap? {
         // Layer 1: Check Icon Pack
         val packPkg = preferenceManager.iconPackPackageName
         if (packPkg != "system" && packPkg.isNotEmpty()) {
@@ -79,7 +85,7 @@ class UniversalIconLoader(private val context: Context) {
             val drawable = pm.getApplicationIcon(packageName)
             drawableToBitmap(drawable)
         } catch (e: Exception) {
-            Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
+            null
         }
     }
 
@@ -96,3 +102,88 @@ class UniversalIconLoader(private val context: Context) {
         return bitmap
     }
 }
+
+// Helper utilities for Jetpack Compose integration of adaptive base64 icons
+@Composable
+fun AppIcon(
+    packageName: String,
+    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
+    iconBase64: String? = null,
+    shape: androidx.compose.ui.graphics.Shape = androidx.compose.foundation.shape.RoundedCornerShape(22),
+    fallbackIconName: String = "apps",
+    tintColor: androidx.compose.ui.graphics.Color? = null
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val iconLoader = remember { UniversalIconLoader(context) }
+    
+    val iconBitmapState = androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(
+        initialValue = null, 
+        key1 = packageName, 
+        key2 = iconBase64
+    ) {
+        try {
+            val rawBase64 = if (!iconBase64.isNullOrEmpty()) {
+                if (iconBase64.contains(",")) iconBase64.substringAfter(",") else iconBase64
+            } else {
+                iconLoader.resolveIcon(packageName)
+            }
+            if (rawBase64.length > 20) {
+                val decodedBytes = Base64.decode(rawBase64, Base64.DEFAULT)
+                val bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+                value = bitmap?.asImageBitmap()
+            }
+        } catch (_: Exception) {}
+    }
+
+    val bitmap = iconBitmapState.value
+    if (bitmap != null) {
+        androidx.compose.foundation.Image(
+            bitmap = bitmap,
+            contentDescription = null,
+            modifier = modifier.clip(shape)
+        )
+    } else {
+        androidx.compose.material3.Icon(
+            imageVector = when(fallbackIconName) {
+                "phone" -> androidx.compose.material.icons.Icons.Default.Phone
+                "message" -> androidx.compose.material.icons.Icons.Default.Message
+                "globe" -> androidx.compose.material.icons.Icons.Default.Public
+                "camera" -> androidx.compose.material.icons.Icons.Default.CameraAlt
+                "brain" -> androidx.compose.material.icons.Icons.Default.AutoAwesome
+                "folder" -> androidx.compose.material.icons.Icons.Default.Folder
+                "code" -> androidx.compose.material.icons.Icons.Default.Code
+                "music" -> androidx.compose.material.icons.Icons.Default.MusicNote
+                "mail" -> androidx.compose.material.icons.Icons.Default.Mail
+                "video" -> androidx.compose.material.icons.Icons.Default.PlayCircle
+                "calendar" -> androidx.compose.material.icons.Icons.Default.CalendarToday
+                "settings" -> androidx.compose.material.icons.Icons.Default.Settings
+                "note" -> androidx.compose.material.icons.Icons.Default.EditNote
+                "calculator" -> androidx.compose.material.icons.Icons.Default.Calculate
+                "cloud" -> androidx.compose.material.icons.Icons.Default.Cloud
+                "file" -> androidx.compose.material.icons.Icons.Default.InsertDriveFile
+                "clock" -> androidx.compose.material.icons.Icons.Default.AccessTime
+                else -> androidx.compose.material.icons.Icons.Default.Apps
+            },
+            contentDescription = null,
+            tint = tintColor ?: androidx.compose.material3.MaterialTheme.colorScheme.primary,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+fun AppIconImage(
+    packageName: String,
+    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
+    fallbackIconName: String = "apps",
+    tintColor: androidx.compose.ui.graphics.Color? = null
+) {
+    AppIcon(
+        packageName = packageName,
+        modifier = modifier,
+        fallbackIconName = fallbackIconName,
+        tintColor = tintColor
+    )
+}
+
+

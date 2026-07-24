@@ -186,8 +186,8 @@ class LauncherRepository(private val context: Context) {
                 if (existing != null) {
                     updatedAppsList.add(existing.copy(name = label))
                 } else {
-                    val isSystem = (resolveInfo.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                    val category = if (isSystem) "system" else "user"
+                    val appInfo = resolveInfo.activityInfo.applicationInfo
+                    val category = categorizePackage(pkgName, appInfo)
                     val colorHex = stringToHexColor(pkgName)
                     updatedAppsList.add(
                         SystemApp(
@@ -221,6 +221,48 @@ class LauncherRepository(private val context: Context) {
             Log.e("LauncherRepository", "Failed to scan device packages", e)
         }
         return emptyList()
+    }
+
+    private fun categorizePackage(pkgName: String, appInfo: ApplicationInfo?): String {
+        if (pkgName.startsWith("com.piuu.")) return "piuu_suite"
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && appInfo != null) {
+            when (appInfo.category) {
+                ApplicationInfo.CATEGORY_SOCIAL, ApplicationInfo.CATEGORY_NEWS -> return "social"
+                ApplicationInfo.CATEGORY_PRODUCTIVITY -> return "productivity"
+                ApplicationInfo.CATEGORY_AUDIO, ApplicationInfo.CATEGORY_VIDEO, ApplicationInfo.CATEGORY_GAME -> return "entertainment"
+                ApplicationInfo.CATEGORY_IMAGE -> return "creative"
+                ApplicationInfo.CATEGORY_MAPS -> return "utilities"
+            }
+        }
+
+        val lower = pkgName.lowercase()
+        return when {
+            lower.contains("social") || lower.contains("instagram") || lower.contains("twitter") ||
+            lower.contains("facebook") || lower.contains("whatsapp") || lower.contains("telegram") ||
+            lower.contains("messenger") || lower.contains("snapchat") || lower.contains("tiktok") ||
+            lower.contains("linkedin") || lower.contains("discord") || lower.contains("reddit") -> "social"
+
+            lower.contains("mail") || lower.contains("gmail") || lower.contains("calendar") ||
+            lower.contains("note") || lower.contains("doc") || lower.contains("sheet") ||
+            lower.contains("task") || lower.contains("keep") || lower.contains("office") ||
+            lower.contains("todo") -> "productivity"
+
+            lower.contains("youtube") || lower.contains("spotify") || lower.contains("music") ||
+            lower.contains("video") || lower.contains("netflix") || lower.contains("game") ||
+            lower.contains("stream") || lower.contains("media") || lower.contains("player") -> "entertainment"
+
+            lower.contains("chrome") || lower.contains("browser") || lower.contains("calc") ||
+            lower.contains("weather") || lower.contains("clock") || lower.contains("tool") ||
+            lower.contains("utility") || lower.contains("map") -> "utilities"
+
+            lower.contains("camera") || lower.contains("photo") || lower.contains("design") ||
+            lower.contains("edit") || lower.contains("canvas") || lower.contains("paint") -> "creative"
+
+            (appInfo?.flags?.and(ApplicationInfo.FLAG_SYSTEM)) != 0 -> "system"
+
+            else -> "utilities"
+        }
     }
 
     private fun stringToHexColor(str: String): String {

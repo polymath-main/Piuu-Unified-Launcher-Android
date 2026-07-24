@@ -345,9 +345,23 @@ class LauncherJsBridge(
             val type = object : TypeToken<Map<String, Any>>() {}.type
             val map: Map<String, Any> = gson.fromJson(valuesJson, type)
 
+            var newTheme = schema.theme
+            if (map.containsKey("theme") && map["theme"] != null) {
+                try {
+                    val themeJson = gson.toJson(map["theme"])
+                    val parsedTheme = gson.fromJson(themeJson, LauncherTheme::class.java)
+                    if (parsedTheme != null && !parsedTheme.name.isNullOrEmpty()) {
+                        newTheme = parsedTheme
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
             val updatedSchema = schema.copy(
                 schema_id = (map["schema_id"] as? String) ?: schema.schema_id,
                 version = (map["version"] as? String) ?: schema.version,
+                theme = newTheme,
                 drawer_layout = (map["drawer_layout"] as? String) ?: schema.drawer_layout,
                 active_font = (map["active_font"] as? String) ?: schema.active_font,
                 active_icon_pack = (map["active_icon_pack"] as? String) ?: schema.active_icon_pack,

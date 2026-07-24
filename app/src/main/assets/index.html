@@ -373,9 +373,57 @@
         }
 
         /* High-performance Flutter-smooth spring curves and transitions */
-        .app-item, .category-header, .notification-item, .search-box, .stats-card {
+        .app-item, .category-header, .notification-item, .search-box, .stats-card, .app-grid, .category-section, .marketplace-card {
             transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
             will-change: transform, opacity;
+            transform: translateZ(0);
+            contain: layout style;
+        }
+
+        .category-section {
+            min-height: 48px;
+        }
+
+        .search-container {
+            contain: layout size style;
+            min-height: 52px;
+        }
+
+        /* Config Modal Overlay Styles */
+        .config-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(2, 8, 23, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        .config-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .config-card {
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
 
         /* Real-time Notification Center Styles */
@@ -547,7 +595,55 @@
             <div class="title" id="launcher-title">Piuu App Hub</div>
             <div class="subtitle">Hybrid Low-Latency Launcher</div>
         </div>
-        <div class="badge" id="latency-badge">Syncing...</div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <button onclick="openConfigModal(event)" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-primary); border-radius: 12px; padding: 6px 12px; cursor: pointer; font-size: 11px; font-weight: bold; display: flex; align-items: center; gap: 4px; backdrop-filter: var(--glass-blur);">⚙️ Config</button>
+            <div class="badge" id="latency-badge">Syncing...</div>
+        </div>
+    </div>
+
+    <!-- App Drawer Configuration Overlay Modal -->
+    <div id="config-overlay" class="config-overlay" onclick="closeConfigModal(event)">
+        <div class="config-card" onclick="event.stopPropagation()">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-size: 16px; font-weight: bold; color: var(--text-primary);">App Drawer Configuration</div>
+                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Customize grid density, icon scaling, and category visibility</div>
+                </div>
+                <button onclick="closeConfigModal()" style="background: transparent; border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer;">×</button>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 4px;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">Grid Columns Density</div>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="setGridDensity(3)" id="btn-col-3" class="marketplace-btn" style="flex: 1; background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-primary);">3 Cols</button>
+                        <button onclick="setGridDensity(4)" id="btn-col-4" class="marketplace-btn" style="flex: 1; background: var(--primary-blue); border: none; color: #fff;">4 Cols</button>
+                        <button onclick="setGridDensity(5)" id="btn-col-5" class="marketplace-btn" style="flex: 1; background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-primary);">5 Cols</button>
+                        <button onclick="setGridDensity(6)" id="btn-col-6" class="marketplace-btn" style="flex: 1; background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-primary);">6 Cols</button>
+                    </div>
+                </div>
+
+                <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
+                        <span>Icon Size Scaling</span>
+                        <span id="icon-size-val" style="color: var(--primary-blue);">52px</span>
+                    </div>
+                    <input type="range" id="icon-size-slider" min="40" max="68" value="52" style="width: 100%; accent-color: var(--primary-blue);" oninput="previewIconSize(this.value)">
+                </div>
+
+                <div>
+                    <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">Category Visibility</div>
+                    <div id="category-toggles-container" style="display: flex; flex-direction: column; gap: 6px; max-height: 140px; overflow-y: auto;">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+                <button onclick="closeConfigModal()" class="marketplace-btn" style="background: rgba(255, 255, 255, 0.08); color: var(--text-primary);">Cancel</button>
+                <button onclick="saveDrawerConfiguration()" class="marketplace-btn">Save & Sync</button>
+            </div>
+        </div>
     </div>
 
     <div class="search-container">
@@ -777,68 +873,210 @@
             }
         }
 
-        // Asynchronously fetch high quality native icons and inject them to avoid main thread layout lag!
-        function loadHighQualityIcon(packageName, imgId) {
-            // Check memory cache first
-            if (iconCache[packageName]) {
-                const img = document.getElementById(imgId);
-                if (img) img.src = iconCache[packageName];
-                return;
+        // Robust Queue-based IconManager with payload validation & stylized letter-tile fallback
+        class IconManager {
+            constructor(maxConcurrent = 6) {
+                this.queue = [];
+                this.activeCount = 0;
+                this.maxConcurrent = maxConcurrent;
             }
-
-            // Check if we already have the icon_base64 from the batched retrieval
-            const app = allApps.find(a => a.package_name === packageName);
-            if (app && app.icon_base64) {
-                const dataUrl = `data:image/webp;base64,${app.icon_base64}`;
-                iconCache[packageName] = dataUrl;
-                const img = document.getElementById(imgId);
-                if (img) img.src = dataUrl;
-                return;
+            enqueue(packageName, imgId) {
+                this.queue.push({ packageName, imgId });
+                this.processQueue();
             }
-
-            // Check localStorage web cache next to speed up consecutive launches
-            const localCachedIcon = localStorage.getItem(`icon_pkg_${packageName}`);
-            if (localCachedIcon) {
-                iconCache[packageName] = localCachedIcon;
-                const img = document.getElementById(imgId);
-                if (img) img.src = localCachedIcon;
-                return;
+            processQueue() {
+                if (this.activeCount >= this.maxConcurrent || this.queue.length === 0) return;
+                this.activeCount++;
+                const task = this.queue.shift();
+                this.loadIconTask(task, () => {
+                    this.activeCount--;
+                    this.processQueue();
+                });
             }
+            loadIconTask(task, done) {
+                const { packageName, imgId } = task;
+                const img = document.getElementById(imgId);
+                if (!img) { done(); return; }
 
-            // Fetch from native bridge asynchronously
-            setTimeout(() => {
-                if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.getAppIconBase64WebP === 'function') {
+                if (iconCache[packageName]) {
+                    img.src = iconCache[packageName];
+                    img.onerror = () => this.applyFallback(img, packageName);
+                    done();
+                    return;
+                }
+
+                const app = allApps.find(a => a.package_name === packageName);
+                if (app && app.icon_base64 && app.icon_base64.length > 20) {
+                    const prefix = app.icon_base64.startsWith('UklGR') ? 'image/webp' : 'image/png';
+                    const dataUrl = `data:${prefix};base64,${app.icon_base64}`;
+                    this.validateAndSetIcon(img, dataUrl, packageName, done);
+                    return;
+                }
+
+                const local = localStorage.getItem(`icon_pkg_${packageName}`);
+                if (local) {
+                    this.validateAndSetIcon(img, local, packageName, done);
+                    return;
+                }
+
+                setTimeout(() => {
                     try {
-                        const base64 = window.AndroidLauncherBridge.getAppIconBase64WebP(packageName);
-                        if (base64) {
-                            const dataUrl = `data:image/webp;base64,${base64}`;
-                            iconCache[packageName] = dataUrl;
-                            // Persist to web storage for lightning fast local startup
-                            localStorage.setItem(`icon_pkg_${packageName}`, dataUrl);
-                            
-                            const img = document.getElementById(imgId);
-                            if (img) img.src = dataUrl;
+                        let base64 = "";
+                        if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.getAppIconBase64WebP === 'function') {
+                            base64 = window.AndroidLauncherBridge.getAppIconBase64WebP(packageName);
+                        } else if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.getAppIconBase64 === 'function') {
+                            base64 = window.AndroidLauncherBridge.getAppIconBase64(packageName);
                         }
-                    } catch (e) {
-                        console.error("Error fetching native WebP icon for " + packageName, e);
+                        if (base64 && base64.length > 20) {
+                            const prefix = base64.startsWith('UklGR') ? 'image/webp' : 'image/png';
+                            const dataUrl = `data:${prefix};base64,${base64}`;
+                            this.validateAndSetIcon(img, dataUrl, packageName, done);
+                        } else {
+                            this.applyFallback(img, packageName);
+                            done();
+                        }
+                    } catch(e) {
+                        this.applyFallback(img, packageName);
+                        done();
                     }
-                } else if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.getAppIconBase64 === 'function') {
-                    try {
-                        const base64 = window.AndroidLauncherBridge.getAppIconBase64(packageName);
-                        if (base64) {
-                            const dataUrl = `data:image/png;base64,${base64}`;
-                            iconCache[packageName] = dataUrl;
-                            // Persist to web storage for lightning fast local startup
-                            localStorage.setItem(`icon_pkg_${packageName}`, dataUrl);
-                            
-                            const img = document.getElementById(imgId);
-                            if (img) img.src = dataUrl;
-                        }
-                    } catch (e) {
-                        console.error("Error fetching native PNG icon for " + packageName, e);
+                }, 0);
+            }
+            validateAndSetIcon(img, dataUrl, packageName, done) {
+                img.onerror = () => {
+                    this.applyFallback(img, packageName);
+                    done();
+                };
+                img.onload = () => {
+                    iconCache[packageName] = dataUrl;
+                    localStorage.setItem(`icon_pkg_${packageName}`, dataUrl);
+                    done();
+                };
+                img.src = dataUrl;
+            }
+            applyFallback(img, packageName) {
+                const app = allApps.find(a => a.package_name === packageName);
+                const name = app ? app.name : packageName;
+                const initial = name ? name.charAt(0).toUpperCase() : 'A';
+                const bg = (app && (app.accent_color || app.theme_color)) || '#3b82f6';
+                const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'><rect width='64' height='64' rx='16' fill='${bg}'/><text x='32' y='40' font-family='sans-serif' font-size='28' font-weight='bold' fill='%23ffffff' text-anchor='middle'>${initial}</text></svg>`;
+                img.src = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+            }
+        }
+        const globalIconManager = new IconManager(6);
+
+        function loadHighQualityIcon(packageName, imgId) {
+            globalIconManager.enqueue(packageName, imgId);
+        }
+
+        let currentConfigGridCols = 4;
+        let currentConfigIconSize = 52;
+        let categoryVisibilityMap = {};
+
+        function openConfigModal(event) {
+            if (event) event.stopPropagation();
+            if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.getLauncherConfig === 'function') {
+                try {
+                    const cfg = JSON.parse(window.AndroidLauncherBridge.getLauncherConfig());
+                    currentConfigGridCols = cfg.drawerColumns || 4;
+                    currentConfigIconSize = cfg.drawerIconSize || 52;
+                    if (cfg.categoryVisibility) categoryVisibilityMap = cfg.categoryVisibility;
+                } catch(e) {}
+            }
+            
+            setGridDensity(currentConfigGridCols, false);
+            const slider = document.getElementById('icon-size-slider');
+            if (slider) {
+                slider.value = currentConfigIconSize;
+                document.getElementById('icon-size-val').innerText = currentConfigIconSize + 'px';
+            }
+            populateCategoryToggles();
+            document.getElementById('config-overlay').classList.add('active');
+        }
+
+        function closeConfigModal(event) {
+            if (event && event.target !== document.getElementById('config-overlay') && event.target.tagName !== 'BUTTON') {
+                return;
+            }
+            document.getElementById('config-overlay').classList.remove('active');
+        }
+
+        function setGridDensity(cols, updateStyle = true) {
+            currentConfigGridCols = cols;
+            [3, 4, 5, 6].forEach(c => {
+                const btn = document.getElementById(`btn-col-${c}`);
+                if (btn) {
+                    if (c === cols) {
+                        btn.style.background = 'var(--primary-blue)';
+                        btn.style.color = '#fff';
+                        btn.style.border = 'none';
+                    } else {
+                        btn.style.background = 'var(--card-bg)';
+                        btn.style.color = 'var(--text-primary)';
+                        btn.style.border = '1px solid var(--card-border)';
                     }
                 }
-            }, 0);
+            });
+            if (updateStyle) {
+                document.documentElement.style.setProperty('--drawer-columns', cols);
+                document.querySelectorAll('.app-grid').forEach(grid => {
+                    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+                });
+            }
+        }
+
+        function previewIconSize(size) {
+            currentConfigIconSize = parseInt(size, 10);
+            document.getElementById('icon-size-val').innerText = size + 'px';
+            document.documentElement.style.setProperty('--icon-size', size + 'px');
+        }
+
+        function populateCategoryToggles() {
+            const container = document.getElementById('category-toggles-container');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            const categories = ['favorites', 'social', 'productivity', 'entertainment', 'system', 'utilities', 'finance', 'creative', 'piuu_suite'];
+            categories.forEach(cat => {
+                const isVisible = categoryVisibilityMap[cat] !== false;
+                const row = document.createElement('div');
+                row.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid var(--card-border);';
+                row.innerHTML = `
+                    <span style="font-size: 12px; color: var(--text-primary); font-weight: 500;">${getCategoryLabel(cat)}</span>
+                    <input type="checkbox" ${isVisible ? 'checked' : ''} onchange="toggleCategoryVisibility('${cat}', this.checked)" style="accent-color: var(--primary-blue); width: 16px; height: 16px; cursor: pointer;">
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function toggleCategoryVisibility(category, isVisible) {
+            categoryVisibilityMap[category] = isVisible;
+            const sec = document.getElementById(`sec-${category}`);
+            if (sec) {
+                if (isVisible) sec.classList.remove('hidden');
+                else sec.classList.add('hidden');
+            }
+        }
+
+        function saveDrawerConfiguration() {
+            const configObj = {
+                drawerColumns: currentConfigGridCols,
+                drawerIconSize: currentConfigIconSize,
+                categoryVisibility: categoryVisibilityMap,
+                updated_at: new Date().toISOString()
+            };
+
+            if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.saveLauncherConfig === 'function') {
+                try {
+                    window.AndroidLauncherBridge.saveLauncherConfig(JSON.stringify(configObj));
+                } catch(e) {}
+            }
+
+            localStorage.setItem('piuu_launcher_config', JSON.stringify(configObj));
+            document.documentElement.style.setProperty('--drawer-columns', currentConfigGridCols);
+            document.documentElement.style.setProperty('--icon-size', currentConfigIconSize + 'px');
+
+            document.getElementById('config-overlay').classList.remove('active');
+            showToast("App Drawer configuration saved successfully!");
         }
 
         function renderAll(apps) {
@@ -1178,20 +1416,34 @@
             }
         }
 
+        // ── Wallpaper Integration ────────────────────────────────────────────────────
+        function initWallpaper() {
+            if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.getSystemWallpaperBase64 === 'function') {
+                try {
+                    const wp = window.AndroidLauncherBridge.getSystemWallpaperBase64();
+                    if (wp && wp.length > 50) {
+                        document.body.style.backgroundImage = `url(${wp})`;
+                        document.body.style.backgroundSize = 'cover';
+                        document.body.style.backgroundPosition = 'center';
+                        document.body.style.backgroundAttachment = 'fixed';
+                    }
+                } catch(e) {}
+            }
+        }
+
         // ── SchemeStore / Marketplace Integration ────────────────────────────────────
         let activeMarketplaceCategory = 'themes';
+        let currentSchemesRegistry = {};
 
         function changeMarketplaceTab(category, event) {
             if (event) event.stopPropagation();
             activeMarketplaceCategory = category;
             
-            // Clear search input on tab change
             const searchInput = document.getElementById('marketplace-search-input');
             if (searchInput) {
                 searchInput.value = '';
             }
             
-            // Update Tab styles
             ['themes', 'fonts', 'icons', 'layouts', 'agents'].forEach(cat => {
                 const tab = document.getElementById(`tab-marketplace-${cat}`);
                 if (tab) {
@@ -1216,6 +1468,8 @@
 
         function loadMarketplaceData() {
             let schemes = [];
+            currentSchemesRegistry = {};
+
             if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.getSchemes === 'function') {
                 try {
                     const json = window.AndroidLauncherBridge.getSchemes(activeMarketplaceCategory);
@@ -1223,8 +1477,10 @@
                 } catch(e) {
                     console.error("Error reading marketplace schemes from bridge", e);
                 }
-            } else {
-                // Fallback / Mock schemes in in-browser preview
+            }
+            
+            if (!schemes || schemes.length === 0) {
+                // Fallback built-in schemes
                 if (activeMarketplaceCategory === 'themes') {
                     schemes = [
                         {id: "theme_midnight", category: "themes", name: "Midnight Dark", author: "Piuu System", description: "Default sleek midnight dark theme with royal blue accents.", payload: JSON.stringify({id: "theme_midnight", name: "Midnight Dark", bg_color: "#020817", card_bg: "rgba(30, 41, 59, 0.45)", card_border: "rgba(255, 255, 255, 0.08)", text_primary: "#f8fafc", text_secondary: "#94a3b8", primary_blue: "#3b82f6", accent_purple: "#8b5cf6", glass_blur: "blur(12px)", icon_size: "52px", drawer_columns: "4", card_opacity: "0.85"})},
@@ -1241,15 +1497,15 @@
                     ];
                 } else if (activeMarketplaceCategory === 'icons') {
                     schemes = [
-                        {id: "iconpack_neon", category: "icons", name: "Cyber Glyphs Iconpack", author: "NeoTokyo Labs", description: "High glow icons that light up along primary aesthetic lines", payload: "{}"},
-                        {id: "iconpack_pastel", category: "icons", name: "Pastel Candy Flat", author: "SoftVibe Studio", description: "Minimal non-skeuomorphic pastel icons featuring soft paper curves", payload: "{}"},
-                        {id: "iconpack_monochrome", category: "icons", name: "Slate Outline Pack", author: "Monochrome", description: "Single-tone thin white wire outlines offering clean modern minimal looks", payload: "{}"},
-                        {id: "iconpack_pixel", category: "icons", name: "Pixel Art 8-Bit", author: "RetroVibe", description: "Handmade nostalgia-filled pixelated shapes of popular apps", payload: "{}"}
+                        {id: "iconpack_neon", category: "icons", name: "Cyber Glyphs Iconpack", author: "NeoTokyo Labs", description: "High glow icons that light up along primary aesthetic lines", payload: JSON.stringify({id: "iconpack_neon", name: "Cyber Glyphs Iconpack"})},
+                        {id: "iconpack_pastel", category: "icons", name: "Pastel Candy Flat", author: "SoftVibe Studio", description: "Minimal non-skeuomorphic pastel icons featuring soft paper curves", payload: JSON.stringify({id: "iconpack_pastel", name: "Pastel Candy Flat"})},
+                        {id: "iconpack_monochrome", category: "icons", name: "Slate Outline Pack", author: "Monochrome", description: "Single-tone thin white wire outlines offering clean modern minimal looks", payload: JSON.stringify({id: "iconpack_monochrome", name: "Slate Outline Pack"})},
+                        {id: "iconpack_pixel", category: "icons", name: "Pixel Art 8-Bit", author: "RetroVibe", description: "Handmade nostalgia-filled pixelated shapes of popular apps", payload: JSON.stringify({id: "iconpack_pixel", name: "Pixel Art 8-Bit"})}
                     ];
                 } else if (activeMarketplaceCategory === 'layouts') {
                     schemes = [
-                        {id: "layout_categorized", category: "layouts", name: "Smart Categorized", author: "Piuu Core", description: "Auto-groups application icons into smart folders using lightweight NLP rules", payload: "{}"},
-                        {id: "layout_vertical", category: "layouts", name: "Classic Vertical Grid", author: "AOSP Dev", description: "Traditional vertical scrolling app grid with responsive fling speed", payload: "{}"}
+                        {id: "layout_categorized", category: "layouts", name: "Smart Categorized", author: "Piuu Core", description: "Auto-groups application icons into smart folders using lightweight NLP rules", payload: JSON.stringify({id: "layout_categorized", name: "Smart Categorized"})},
+                        {id: "layout_vertical", category: "layouts", name: "Classic Vertical Grid", author: "AOSP Dev", description: "Traditional vertical scrolling app grid with responsive fling speed", payload: JSON.stringify({id: "layout_vertical", name: "Classic Vertical Grid"})}
                     ];
                 } else if (activeMarketplaceCategory === 'agents') {
                     schemes = [
@@ -1260,6 +1516,11 @@
                     ];
                 }
             }
+
+            // Register schemes in registry map
+            schemes.forEach(s => {
+                currentSchemesRegistry[s.id] = s;
+            });
 
             // Apply search filtering
             const searchInput = document.getElementById('marketplace-search-input');
@@ -1276,7 +1537,7 @@
             const count = document.getElementById('count-marketplace');
             if (grid) {
                 grid.innerHTML = '';
-                count.innerText = schemes.length;
+                if (count) count.innerText = schemes.length;
 
                 schemes.forEach(scheme => {
                     const card = document.createElement('div');
@@ -1287,7 +1548,7 @@
                             <div class="marketplace-author">By ${scheme.author}</div>
                             <div class="marketplace-desc">${scheme.description}</div>
                         </div>
-                        <button class="marketplace-btn" onclick="applyMarketplaceScheme('${scheme.category}', '${scheme.id}', ${encodeURIComponent(JSON.stringify(scheme.payload))}, event)">Apply</button>
+                        <button class="marketplace-btn" onclick="applySchemeById('${scheme.id}', event)">Apply</button>
                     `;
                     grid.appendChild(card);
                 });
@@ -1314,80 +1575,76 @@
             }
             if (themeObj.card_opacity) root.style.setProperty('--card-opacity', themeObj.card_opacity);
 
-            // Persist to local cache so it loads instantly on next cold boot
             localStorage.setItem('active_theme_schema', JSON.stringify(themeObj));
         }
 
-        function applyMarketplaceScheme(category, id, payloadStr, event) {
+        function applySchemeById(schemeId, event) {
             if (event) event.stopPropagation();
-            const payload = typeof payloadStr === 'string' ? JSON.parse(decodeURIComponent(payloadStr)) : payloadStr;
-            
+            const scheme = currentSchemesRegistry[schemeId];
+            if (!scheme) {
+                showToast("Error: Scheme not found in registry");
+                return;
+            }
+
+            let payloadObj = {};
+            try {
+                if (typeof scheme.payload === 'string') {
+                    payloadObj = JSON.parse(scheme.payload);
+                } else if (scheme.payload) {
+                    payloadObj = scheme.payload;
+                }
+            } catch(e) {
+                payloadObj = { id: scheme.id, name: scheme.name };
+            }
+
+            const category = scheme.category || activeMarketplaceCategory;
+            const root = document.documentElement;
+
             if (category === 'themes') {
-                const themeObj = typeof payload === 'string' ? JSON.parse(payload) : payload;
-                applyThemeSchema(themeObj);
-                
-                // Expose to native if possible
+                applyThemeSchema(payloadObj);
                 if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.applySchemaValues === 'function') {
                     try {
-                        const schemeValues = {
-                            schema_id: themeObj.id,
-                            theme: themeObj,
+                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify({
+                            schema_id: scheme.id,
+                            theme: payloadObj,
                             version: "1.0"
-                        };
-                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify(schemeValues));
-                    } catch(e) {
-                        console.error("Error updating schema in backend", e);
-                    }
-                }
-                showToast(`Applied theme: ${themeObj.name}`);
-            } else if (category === 'icons') {
-                const iconObj = typeof payload === 'string' ? JSON.parse(payload) : payload;
-                if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.applySchemaValues === 'function') {
-                    try {
-                        const schemeValues = {
-                            active_icon_pack: iconObj.icon_pack_name || iconObj.id
-                        };
-                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify(schemeValues));
+                        }));
                     } catch(e) {}
                 }
-                showToast(`Applied icon pack: ${id}`);
-            } else if (category === 'layouts') {
-                const layoutObj = typeof payload === 'string' ? JSON.parse(payload) : payload;
-                if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.applySchemaValues === 'function') {
-                    try {
-                        const schemeValues = {
-                            drawer_layout: layoutObj.layout_name || layoutObj.id
-                        };
-                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify(schemeValues));
-                    } catch(e) {}
-                }
-                showToast(`Applied layout: ${id}`);
+                showToast(`Successfully applied theme: ${scheme.name}`);
             } else if (category === 'fonts') {
-                const fontObj = typeof payload === 'string' ? JSON.parse(payload) : payload;
-                if (fontObj.font_family) {
-                    document.documentElement.style.setProperty('--font-family', fontObj.font_family);
-                    document.body.style.fontFamily = fontObj.font_family;
-                }
+                const fontFamily = payloadObj.font_family || 'Inter, sans-serif';
+                root.style.setProperty('--font-family', fontFamily);
+                document.body.style.fontFamily = fontFamily;
                 if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.applySchemaValues === 'function') {
                     try {
-                        const schemeValues = {
-                            active_font: fontObj.font_family || fontObj.id
-                        };
-                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify(schemeValues));
+                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify({ active_font: fontFamily }));
                     } catch(e) {}
                 }
-                showToast(`Applied font: ${fontObj.name}`);
+                showToast(`Successfully applied font: ${scheme.name}`);
+            } else if (category === 'icons') {
+                if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.applySchemaValues === 'function') {
+                    try {
+                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify({ active_icon_pack: scheme.id }));
+                    } catch(e) {}
+                }
+                showToast(`Successfully applied icon pack: ${scheme.name}`);
+            } else if (category === 'layouts') {
+                if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.applySchemaValues === 'function') {
+                    try {
+                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify({ drawer_layout: scheme.id }));
+                    } catch(e) {}
+                }
+                showToast(`Successfully applied layout: ${scheme.name}`);
             } else if (category === 'agents') {
-                const agentObj = typeof payload === 'string' ? JSON.parse(payload) : payload;
                 if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.applySchemaValues === 'function') {
                     try {
-                        const schemeValues = {
-                            active_agent: agentObj.name || agentObj.id
-                        };
-                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify(schemeValues));
+                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify({ active_agent: scheme.name }));
                     } catch(e) {}
                 }
-                showToast(`Active AI Agent set to: ${agentObj.name}`);
+                showToast(`Active AI Agent set to: ${scheme.name}`);
+            } else {
+                showToast(`Successfully applied: ${scheme.name}`);
             }
         }
 
@@ -1397,9 +1654,7 @@
                 if (cachedTheme) {
                     applyThemeSchema(JSON.parse(cachedTheme));
                 }
-            } catch (e) {
-                console.error("Error restoring cold boot theme", e);
-            }
+            } catch (e) {}
         }
 
         function showToast(msg) {
@@ -1477,6 +1732,7 @@
 
         // Initialize App Hub
         function init() {
+            initWallpaper();
             restoreThemeOnColdBoot();
             loadInstantWebCache();
             fetchFreshNativeApps();

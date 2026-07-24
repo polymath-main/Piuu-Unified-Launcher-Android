@@ -92,6 +92,9 @@ fun QuickSettingsShade(
     var gestureDoubleTap by remember { mutableStateOf(prefManager.gestureDoubleTap) }
     var gestureSwipeLeft by remember { mutableStateOf(prefManager.gestureSwipeLeft) }
     var gestureSwipeRight by remember { mutableStateOf(prefManager.gestureSwipeRight) }
+    var drawerColumnCount by remember { mutableStateOf(prefManager.drawerColumnCount) }
+    var drawerShowFrequentlyUsed by remember { mutableStateOf(prefManager.drawerShowFrequentlyUsed) }
+    var drawerShowCategories by remember { mutableStateOf(prefManager.drawerShowCategories) }
 
     // Permission launchers
     val cameraPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -324,6 +327,124 @@ fun QuickSettingsShade(
                                 prefManager.gestureSwipeRight = action
                             }
                         )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // App Drawer Layout Configuration Card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, LauncherBorder, RoundedCornerShape(20.dp))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("App Drawer Layout Settings", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text("Customize grids, columns, and navigation chips", fontSize = 11.sp, color = TextSecondary)
+                            }
+                            Icon(imageVector = Icons.Default.GridView, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Column count selector
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text("Grid Columns", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                            Text("Number of items in each row of the app drawer grid", fontSize = 11.sp, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf(3, 4, 5, 6).forEach { cols ->
+                                    val isSelected = drawerColumnCount == cols
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isSelected) PrimaryBlue else CardGlassBg)
+                                            .border(1.dp, if (isSelected) PrimaryBlue else LauncherBorder, RoundedCornerShape(10.dp))
+                                            .clickable {
+                                                drawerColumnCount = cols
+                                                prefManager.drawerColumnCount = cols
+                                            }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "$cols Cols",
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) Color.White else TextPrimary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Frequently Used Switch
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Frequently Used Apps", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                Text("Show a quick row of your most launched apps at the top", fontSize = 11.sp, color = TextSecondary)
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Switch(
+                                checked = drawerShowFrequentlyUsed,
+                                onCheckedChange = { checked ->
+                                    drawerShowFrequentlyUsed = checked
+                                    prefManager.drawerShowFrequentlyUsed = checked
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = PrimaryBlue,
+                                    checkedTrackColor = PrimaryBlue.copy(alpha = 0.4f)
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Category Chips Switch
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Category Navigation Chips", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                Text("Filter applications by categories (Utilities, Social, productivity...)", fontSize = 11.sp, color = TextSecondary)
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Switch(
+                                checked = drawerShowCategories,
+                                onCheckedChange = { checked ->
+                                    drawerShowCategories = checked
+                                    prefManager.drawerShowCategories = checked
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = PrimaryBlue,
+                                    checkedTrackColor = PrimaryBlue.copy(alpha = 0.4f)
+                                )
+                            )
+                        }
                     }
                 }
 

@@ -218,11 +218,12 @@ fun LauncherAppMain(
     }
 
     // Main Launcher View Container
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(if (configState.showSystemWallpaper) Color.Transparent else Color(0xFF020817))
-    ) {
+    PiuuLauncherTheme(theme = schema.theme) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(if (configState.showSystemWallpaper) Color.Transparent else Color(0xFF020817))
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -567,5 +568,6 @@ fun LauncherAppMain(
                 }
             }
         )
+    }
     }
 }

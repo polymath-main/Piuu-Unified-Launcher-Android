@@ -64,7 +64,21 @@ class WallpaperHandler(private val context: Context) {
      */
     fun getWallpaperBase64(): String {
         return try {
-            val bitmap = getWallpaperBitmap() ?: return ""
+            var bitmap = getWallpaperBitmap()
+            if (bitmap == null) {
+                // Generate a stunning fallback gradient bitmap
+                bitmap = Bitmap.createBitmap(720, 1280, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bitmap)
+                val paint = android.graphics.Paint().apply {
+                    shader = android.graphics.LinearGradient(
+                        0f, 0f, 720f, 1280f,
+                        intArrayOf(android.graphics.Color.parseColor("#020817"), android.graphics.Color.parseColor("#0f172a"), android.graphics.Color.parseColor("#1e1b4b")),
+                        null,
+                        android.graphics.Shader.TileMode.CLAMP
+                    )
+                }
+                canvas.drawRect(0f, 0f, 720f, 1280f, paint)
+            }
             // Scale down if bitmap is huge to optimize payload size for WebView IPC
             val maxDim = 1280
             val scaled = if (bitmap.width > maxDim || bitmap.height > maxDim) {

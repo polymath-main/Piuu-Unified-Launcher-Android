@@ -38,6 +38,12 @@ fun AppDrawer(
 ) {
     if (!visible) return
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefManager = remember { com.piuu.launcher.repository.LauncherPreferenceManager.getInstance(context) }
+    val showFrequentlyUsed = prefManager.drawerShowFrequentlyUsed
+    val showCategories = prefManager.drawerShowCategories
+    val columnCount = prefManager.drawerColumnCount
+
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("all") }
 
@@ -103,30 +109,31 @@ fun AppDrawer(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Category Chips Row
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(categories) { category ->
-                    val isSelected = category == selectedCategory
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { selectedCategory = category },
-                        label = {
-                            Text(
-                                text = category.replace("_", " ").replaceFirstChar { it.uppercase() },
-                                color = if (isSelected) Color.White else TextSecondary
+            if (showCategories) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(categories) { category ->
+                        val isSelected = category == selectedCategory
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedCategory = category },
+                            label = {
+                                Text(
+                                    text = category.replace("_", " ").replaceFirstChar { it.uppercase() },
+                                    color = if (isSelected) Color.White else TextSecondary
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = PrimaryBlue,
+                                containerColor = CardGlassBg
                             )
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = PrimaryBlue,
-                            containerColor = CardGlassBg
                         )
-                    )
+                    }
                 }
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
             // Frequently Used Row (if no search query)
-            if (searchQuery.isEmpty() && selectedCategory == "all") {
+            if (showFrequentlyUsed && searchQuery.isEmpty() && selectedCategory == "all") {
                 Text("Frequently Used", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -142,11 +149,11 @@ fun AppDrawer(
                                     .background(AccentPurple.copy(alpha = 0.25f)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = getAppIconVector(app.icon_name),
-                                    contentDescription = app.name,
-                                    tint = AccentPurple,
-                                    modifier = Modifier.size(22.dp)
+                                com.piuu.launcher.repository.AppIconImage(
+                                    packageName = app.package_name,
+                                    modifier = Modifier.size(22.dp),
+                                    fallbackIconName = app.icon_name,
+                                    tintColor = AccentPurple
                                 )
                             }
                             Spacer(modifier = Modifier.height(4.dp))
@@ -162,7 +169,7 @@ fun AppDrawer(
 
             // App Grid
             LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
+                columns = GridCells.Fixed(columnCount),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.fillMaxSize()
@@ -200,11 +207,11 @@ fun AppGridTileItem(app: SystemApp, onClick: () -> Unit) {
                     .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = getAppIconVector(app.icon_name),
-                    contentDescription = app.name,
-                    tint = if (app.category == "piuu_suite") SuccessGreen else PrimaryBlue,
-                    modifier = Modifier.size(26.dp)
+                com.piuu.launcher.repository.AppIconImage(
+                    packageName = app.package_name,
+                    modifier = Modifier.size(26.dp),
+                    fallbackIconName = app.icon_name,
+                    tintColor = if (app.category == "piuu_suite") SuccessGreen else PrimaryBlue
                 )
             }
         }
