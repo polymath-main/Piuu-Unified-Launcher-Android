@@ -24,8 +24,8 @@ import androidx.compose.ui.unit.sp
 import com.google.gson.GsonBuilder
 import com.piuu.launcher.model.LauncherSchema
 import com.piuu.launcher.model.LauncherTheme
-import com.piuu.launcher.repository.SchemeStoreManager
-import com.piuu.launcher.repository.SchemeItem
+import com.piuu.launcher.repository.SchemeManager
+import com.piuu.launcher.repository.SchemeConfig
 import com.piuu.launcher.ui.theme.*
 import org.json.JSONObject
 
@@ -52,12 +52,12 @@ fun SchemaEditorModal(
     var selectedCategory by remember { mutableStateOf("themes") }
     val categories = listOf("themes", "fonts", "layouts", "faces", "widgets", "icons", "agents", "skills")
     
-    val schemeStore = remember { SchemeStoreManager.getInstance(context) }
+    val schemeStore = remember { SchemeManager.getInstance(context) }
     var schemesList by remember(selectedCategory) { 
         mutableStateOf(schemeStore.getSchemesForCategory(selectedCategory)) 
     }
     
-    var selectedScheme by remember { mutableStateOf<SchemeItem?>(null) }
+    var selectedScheme by remember { mutableStateOf<SchemeConfig?>(null) }
     
     // Customization editing fields
     var editId by remember { mutableStateOf("") }

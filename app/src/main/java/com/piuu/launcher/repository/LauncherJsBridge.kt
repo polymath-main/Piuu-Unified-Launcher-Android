@@ -284,7 +284,7 @@ class LauncherJsBridge(
     @JavascriptInterface
     fun getSchemes(category: String): String {
         return try {
-            val store = SchemeStoreManager.getInstance(context)
+            val store = SchemeManager.getInstance(context)
             gson.toJson(store.getSchemesForCategory(category))
         } catch (e: Exception) {
             "[]"
@@ -294,7 +294,7 @@ class LauncherJsBridge(
     @JavascriptInterface
     fun saveCustomScheme(category: String, id: String, contentJson: String): Boolean {
         return try {
-            val store = SchemeStoreManager.getInstance(context)
+            val store = SchemeManager.getInstance(context)
             store.saveCustomizedScheme(category, id, contentJson)
         } catch (e: Exception) {
             false

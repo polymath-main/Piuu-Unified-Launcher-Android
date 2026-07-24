@@ -1,0 +1,15 @@
+{
+  "id": "theme_solarized",
+  "name": "Solarized Warm",
+  "bg_color": "#fdf6e3",
+  "card_bg": "rgba(238, 232, 213, 0.6)",
+  "card_border": "rgba(7, 54, 66, 0.12)",
+  "text_primary": "#073642",
+  "text_secondary": "#586e75",
+  "primary_blue": "#268bd2",
+  "accent_purple": "#6c71c4",
+  "glass_blur": "blur(8px)",
+  "icon_size": "52px",
+  "drawer_columns": "4",
+  "card_opacity": "0.9"
+}

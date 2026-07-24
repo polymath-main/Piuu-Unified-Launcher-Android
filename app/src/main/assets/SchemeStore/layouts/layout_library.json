@@ -1,0 +1,7 @@
+{
+  "id": "layout_library",
+  "name": "iOS Style Library",
+  "author": "Cupertino Dev",
+  "description": "Apple-style categorized app tray with dynamic app-search triggers",
+  "layout_name": "ios_library"
+}

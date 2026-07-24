@@ -1,0 +1,15 @@
+{
+  "id": "theme_minimal",
+  "name": "Minimal Slate",
+  "bg_color": "#121212",
+  "card_bg": "rgba(30, 41, 59, 0.2)",
+  "card_border": "rgba(148, 163, 184, 0.15)",
+  "text_primary": "#e2e8f0",
+  "text_secondary": "#64748b",
+  "primary_blue": "#94a3b8",
+  "accent_purple": "#475569",
+  "glass_blur": "blur(4px)",
+  "icon_size": "52px",
+  "drawer_columns": "4",
+  "card_opacity": "0.95"
+}

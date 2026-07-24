@@ -1,0 +1,15 @@
+{
+  "id": "theme_sunset",
+  "name": "Sunset Retro",
+  "bg_color": "#1e112a",
+  "card_bg": "rgba(249, 115, 22, 0.12)",
+  "card_border": "rgba(168, 85, 247, 0.35)",
+  "text_primary": "#f97316",
+  "text_secondary": "#a855f7",
+  "primary_blue": "#f97316",
+  "accent_purple": "#a855f7",
+  "glass_blur": "blur(10px)",
+  "icon_size": "52px",
+  "drawer_columns": "4",
+  "card_opacity": "0.85"
+}

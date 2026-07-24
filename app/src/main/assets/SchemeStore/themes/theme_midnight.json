@@ -1,0 +1,15 @@
+{
+  "id": "theme_midnight",
+  "name": "Midnight Dark",
+  "bg_color": "#020817",
+  "card_bg": "rgba(30, 41, 59, 0.45)",
+  "card_border": "rgba(255, 255, 255, 0.08)",
+  "text_primary": "#f8fafc",
+  "text_secondary": "#94a3b8",
+  "primary_blue": "#3b82f6",
+  "accent_purple": "#8b5cf6",
+  "glass_blur": "blur(12px)",
+  "icon_size": "52px",
+  "drawer_columns": "4",
+  "card_opacity": "0.85"
+}

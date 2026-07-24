@@ -1,0 +1,15 @@
+{
+  "id": "theme_sakura",
+  "name": "Sakura Blossom",
+  "bg_color": "#fff1f2",
+  "card_bg": "rgba(251, 113, 133, 0.15)",
+  "card_border": "rgba(244, 63, 94, 0.2)",
+  "text_primary": "#e11d48",
+  "text_secondary": "#fb7185",
+  "primary_blue": "#f43f5e",
+  "accent_purple": "#ec4899",
+  "glass_blur": "blur(8px)",
+  "icon_size": "52px",
+  "drawer_columns": "4",
+  "card_opacity": "0.95"
+}

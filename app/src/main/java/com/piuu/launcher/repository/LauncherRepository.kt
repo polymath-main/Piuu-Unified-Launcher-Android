@@ -41,7 +41,7 @@ class LauncherRepository(private val context: Context) {
     // ── Default Marketplace Catalog loaded from SchemeStore ─────────────────────
     val marketplaceCatalog: List<MarketplaceItem>
         get() {
-            val store = SchemeStoreManager.getInstance(context)
+            val store = SchemeManager.getInstance(context)
             val categories = listOf("themes", "fonts", "layouts", "faces", "widgets", "icons", "agents", "skills")
             val items = mutableListOf<MarketplaceItem>()
             for (category in categories) {
@@ -57,12 +57,12 @@ class LauncherRepository(private val context: Context) {
                             name = scheme.name,
                             category = cat,
                             author = scheme.author,
-                            rating = scheme.rating,
-                            downloads = scheme.downloads,
+                            rating = 4.8f,
+                            downloads = 1200,
                             description = scheme.description,
-                            preview_badge = scheme.tag,
+                            preview_badge = if (scheme.isCustom) "Custom" else "Official",
                             payload = scheme.payload,
-                            is_installed = scheme.isInstalled
+                            is_installed = true
                         )
                     )
                 }

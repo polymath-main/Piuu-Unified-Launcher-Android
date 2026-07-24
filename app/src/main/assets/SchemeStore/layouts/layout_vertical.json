@@ -1,0 +1,7 @@
+{
+  "id": "layout_vertical",
+  "name": "Classic Vertical Grid",
+  "author": "AOSP Dev",
+  "description": "Traditional vertical scrolling app grid with responsive fling speed",
+  "layout_name": "vertical"
+}

@@ -241,7 +241,7 @@
         /* App Grid Layout */
         .app-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(var(--drawer-columns, 4), 1fr);
             gap: 14px;
             transition: all 0.3s ease;
         }
@@ -264,8 +264,8 @@
 
         .icon-wrapper {
             position: relative;
-            width: 52px;
-            height: 52px;
+            width: var(--icon-size, 52px);
+            height: var(--icon-size, 52px);
             margin-bottom: 8px;
         }
 
@@ -273,7 +273,7 @@
             width: 100%;
             height: 100%;
             border-radius: 16px;
-            background: rgba(30, 41, 59, 0.85);
+            background: var(--card-bg, rgba(30, 41, 59, 0.85));
             border: 1px solid var(--card-border);
             display: flex;
             align-items: center;
@@ -470,6 +470,72 @@
         .notif-dismiss:hover {
             color: #ef4444;
         }
+
+        /* Marketplace Styles */
+        .marketplace-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 8px;
+            backdrop-filter: var(--glass-blur);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .marketplace-card:hover {
+            border-color: var(--primary-blue);
+            transform: translateY(-2px);
+        }
+
+        .marketplace-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .marketplace-author {
+            font-size: 9px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .marketplace-desc {
+            font-size: 10px;
+            color: var(--text-secondary);
+            line-height: 1.3;
+            height: 2.6em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .marketplace-btn {
+            background: var(--primary-blue);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.15s;
+            text-align: center;
+        }
+
+        .marketplace-btn:active {
+            opacity: 0.8;
+        }
+
+        .active-subtab {
+            font-weight: bold;
+            border-bottom: 2px solid var(--primary-blue);
+        }
     </style>
     <!-- SortableJS library for in-browser drag-and-drop reordering of app grid -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -539,6 +605,24 @@
 
         <!-- Categorized Sections Container -->
         <div id="categorized-container"></div>
+
+        <!-- SchemeStore Marketplace Section -->
+        <div class="category-section" id="section-marketplace">
+            <div class="category-header" style="cursor: default;">
+                <div class="category-title" style="color: var(--primary-blue); display: flex; align-items: center; gap: 6px;">
+                    🛍️ Piuu Marketplace <span class="category-count" id="count-marketplace" style="background: rgba(59, 130, 246, 0.15); color: var(--primary-blue);">0</span>
+                </div>
+                <div class="category-chevron" id="marketplace-tab-selector" style="display: flex; gap: 12px; transform: none; font-size: 11px; font-weight: bold;">
+                    <span id="tab-marketplace-themes" onclick="changeMarketplaceTab('themes', event)" style="cursor: pointer; color: var(--primary-blue); border-bottom: 2px solid var(--primary-blue); padding-bottom: 2px;">Themes</span>
+                    <span id="tab-marketplace-icons" onclick="changeMarketplaceTab('icons', event)" style="cursor: pointer; color: var(--text-secondary);">Icons</span>
+                    <span id="tab-marketplace-layouts" onclick="changeMarketplaceTab('layouts', event)" style="cursor: pointer; color: var(--text-secondary);">Layouts</span>
+                </div>
+            </div>
+            
+            <div id="marketplace-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px; margin-bottom: 24px;">
+                <!-- Schemes will be dynamically populated here -->
+            </div>
+        </div>
     </div>
 
     <script>
@@ -1085,6 +1169,194 @@
             }
         }
 
+        // ── SchemeStore / Marketplace Integration ────────────────────────────────────
+        let activeMarketplaceCategory = 'themes';
+
+        function changeMarketplaceTab(category, event) {
+            if (event) event.stopPropagation();
+            activeMarketplaceCategory = category;
+            
+            // Update Tab styles
+            ['themes', 'icons', 'layouts'].forEach(cat => {
+                const tab = document.getElementById(`tab-marketplace-${cat}`);
+                if (tab) {
+                    if (cat === category) {
+                        tab.style.color = 'var(--primary-blue)';
+                        tab.style.borderBottom = '2px solid var(--primary-blue)';
+                        tab.style.fontWeight = 'bold';
+                    } else {
+                        tab.style.color = 'var(--text-secondary)';
+                        tab.style.borderBottom = 'none';
+                        tab.style.fontWeight = 'normal';
+                    }
+                }
+            });
+            
+            loadMarketplaceData();
+        }
+
+        function loadMarketplaceData() {
+            let schemes = [];
+            if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.getSchemes === 'function') {
+                try {
+                    const json = window.AndroidLauncherBridge.getSchemes(activeMarketplaceCategory);
+                    schemes = JSON.parse(json);
+                } catch(e) {
+                    console.error("Error reading marketplace schemes from bridge", e);
+                }
+            } else {
+                // Fallback / Mock schemes in in-browser preview
+                if (activeMarketplaceCategory === 'themes') {
+                    schemes = [
+                        {id: "theme_midnight", category: "themes", name: "Midnight Dark", author: "Piuu System", description: "Default sleek midnight dark theme with royal blue accents.", payload: JSON.stringify({id: "theme_midnight", name: "Midnight Dark", bg_color: "#020817", card_bg: "rgba(30, 41, 59, 0.45)", card_border: "rgba(255, 255, 255, 0.08)", text_primary: "#f8fafc", text_secondary: "#94a3b8", primary_blue: "#3b82f6", accent_purple: "#8b5cf6", glass_blur: "blur(12px)", icon_size: "52px", drawer_columns: "4", card_opacity: "0.85"})},
+                        {id: "theme_solarized", category: "themes", name: "Solarized Warm", author: "Piuu System", description: "Warm neutral theme optimized for direct sunlight reading.", payload: JSON.stringify({id: "theme_solarized", name: "Solarized Warm", bg_color: "#fdf6e3", card_bg: "rgba(238, 232, 213, 0.6)", card_border: "rgba(7, 54, 66, 0.12)", text_primary: "#073642", text_secondary: "#586e75", primary_blue: "#268bd2", accent_purple: "#6c71c4", glass_blur: "blur(8px)", icon_size: "52px", drawer_columns: "4", card_opacity: "0.9"})},
+                        {id: "theme_neon", category: "themes", name: "Cyber Neon", author: "Piuu System", description: "Vibrant glowing synthwave theme with cyan and pink neon lights.", payload: JSON.stringify({id: "theme_neon", name: "Cyber Neon", bg_color: "#090514", card_bg: "rgba(236, 72, 153, 0.12)", card_border: "rgba(6, 182, 212, 0.4)", text_primary: "#06b6d4", text_secondary: "#ec4899", primary_blue: "#06b6d4", accent_purple: "#ec4899", glass_blur: "blur(14px)", icon_size: "52px", drawer_columns: "4", card_opacity: "0.75"})},
+                        {id: "theme_minimal", category: "themes", name: "Minimal Slate", author: "Piuu System", description: "Ultra-clean gray canvas for zero distraction productivity.", payload: JSON.stringify({id: "theme_minimal", name: "Minimal Slate", bg_color: "#121212", card_bg: "rgba(30, 41, 59, 0.2)", card_border: "rgba(148, 163, 184, 0.15)", text_primary: "#e2e8f0", text_secondary: "#64748b", primary_blue: "#94a3b8", accent_purple: "#475569", glass_blur: "blur(4px)", icon_size: "52px", drawer_columns: "4", card_opacity: "0.95"})}
+                    ];
+                } else if (activeMarketplaceCategory === 'icons') {
+                    schemes = [
+                        {id: "iconpack_neon", category: "icons", name: "Cyber Glyphs Iconpack", author: "NeoTokyo Labs", description: "High glow icons that light up along primary aesthetic lines", payload: "{}"},
+                        {id: "iconpack_pastel", category: "icons", name: "Pastel Candy Flat", author: "SoftVibe Studio", description: "Minimal non-skeuomorphic pastel icons featuring soft paper curves", payload: "{}"},
+                        {id: "iconpack_monochrome", category: "icons", name: "Slate Outline Pack", author: "Monochrome", description: "Single-tone thin white wire outlines offering clean modern minimal looks", payload: "{}"},
+                        {id: "iconpack_pixel", category: "icons", name: "Pixel Art 8-Bit", author: "RetroVibe", description: "Handmade nostalgia-filled pixelated shapes of popular apps", payload: "{}"}
+                    ];
+                } else {
+                    schemes = [
+                        {id: "layout_categorized", category: "layouts", name: "Smart Categorized", author: "Piuu Core", description: "Auto-groups application icons into smart folders using lightweight NLP rules", payload: "{}"},
+                        {id: "layout_vertical", category: "layouts", name: "Classic Vertical Grid", author: "AOSP Dev", description: "Traditional vertical scrolling app grid with responsive fling speed", payload: "{}"}
+                    ];
+                }
+            }
+
+            const grid = document.getElementById('marketplace-grid');
+            const count = document.getElementById('count-marketplace');
+            if (grid) {
+                grid.innerHTML = '';
+                count.innerText = schemes.length;
+
+                schemes.forEach(scheme => {
+                    const card = document.createElement('div');
+                    card.className = 'marketplace-card';
+                    card.innerHTML = `
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <div class="marketplace-title">${scheme.name}</div>
+                            <div class="marketplace-author">By ${scheme.author}</div>
+                            <div class="marketplace-desc">${scheme.description}</div>
+                        </div>
+                        <button class="marketplace-btn" onclick="applyMarketplaceScheme('${scheme.category}', '${scheme.id}', ${encodeURIComponent(JSON.stringify(scheme.payload))}, event)">Apply</button>
+                    `;
+                    grid.appendChild(card);
+                });
+            }
+        }
+
+        function applyThemeSchema(themeObj) {
+            if (!themeObj) return;
+            const root = document.documentElement;
+            if (themeObj.bg_color) root.style.setProperty('--bg-color', themeObj.bg_color);
+            if (themeObj.card_bg) root.style.setProperty('--card-bg', themeObj.card_bg);
+            if (themeObj.card_border) root.style.setProperty('--card-border', themeObj.card_border);
+            if (themeObj.text_primary) root.style.setProperty('--text-primary', themeObj.text_primary);
+            if (themeObj.text_secondary) root.style.setProperty('--text-secondary', themeObj.text_secondary);
+            if (themeObj.primary_blue) root.style.setProperty('--primary-blue', themeObj.primary_blue);
+            if (themeObj.accent_purple) root.style.setProperty('--accent-purple', themeObj.accent_purple);
+            if (themeObj.glass_blur) root.style.setProperty('--glass-blur', themeObj.glass_blur);
+            if (themeObj.icon_size) root.style.setProperty('--icon-size', themeObj.icon_size);
+            if (themeObj.drawer_columns) {
+                root.style.setProperty('--drawer-columns', themeObj.drawer_columns);
+                document.querySelectorAll('.app-grid').forEach(grid => {
+                    grid.style.gridTemplateColumns = `repeat(${themeObj.drawer_columns}, 1fr)`;
+                });
+            }
+            if (themeObj.card_opacity) root.style.setProperty('--card-opacity', themeObj.card_opacity);
+
+            // Persist to local cache so it loads instantly on next cold boot
+            localStorage.setItem('active_theme_schema', JSON.stringify(themeObj));
+        }
+
+        function applyMarketplaceScheme(category, id, payloadStr, event) {
+            if (event) event.stopPropagation();
+            const payload = typeof payloadStr === 'string' ? JSON.parse(decodeURIComponent(payloadStr)) : payloadStr;
+            
+            if (category === 'themes') {
+                const themeObj = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                applyThemeSchema(themeObj);
+                
+                // Expose to native if possible
+                if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.applySchemaValues === 'function') {
+                    try {
+                        const schemeValues = {
+                            schema_id: themeObj.id,
+                            theme: themeObj,
+                            version: "1.0"
+                        };
+                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify(schemeValues));
+                    } catch(e) {
+                        console.error("Error updating schema in backend", e);
+                    }
+                }
+                showToast(`Applied theme: ${themeObj.name}`);
+            } else if (category === 'icons') {
+                const iconObj = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.applySchemaValues === 'function') {
+                    try {
+                        const schemeValues = {
+                            active_icon_pack: iconObj.icon_pack_name || iconObj.id
+                        };
+                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify(schemeValues));
+                    } catch(e) {}
+                }
+                showToast(`Applied icon pack: ${id}`);
+            } else if (category === 'layouts') {
+                const layoutObj = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.applySchemaValues === 'function') {
+                    try {
+                        const schemeValues = {
+                            drawer_layout: layoutObj.layout_name || layoutObj.id
+                        };
+                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify(schemeValues));
+                    } catch(e) {}
+                }
+                showToast(`Applied layout: ${id}`);
+            }
+        }
+
+        function restoreThemeOnColdBoot() {
+            try {
+                const cachedTheme = localStorage.getItem('active_theme_schema');
+                if (cachedTheme) {
+                    applyThemeSchema(JSON.parse(cachedTheme));
+                }
+            } catch (e) {
+                console.error("Error restoring cold boot theme", e);
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.style.position = 'fixed';
+            toast.style.bottom = '24px';
+            toast.style.left = '50%';
+            toast.style.transform = 'translateX(-50%)';
+            toast.style.background = 'rgba(2, 8, 23, 0.95)';
+            toast.style.border = '1px solid var(--primary-blue)';
+            toast.style.color = '#fff';
+            toast.style.padding = '8px 16px';
+            toast.style.borderRadius = '20px';
+            toast.style.fontSize = '12px';
+            toast.style.fontWeight = 'bold';
+            toast.style.zIndex = '9999';
+            toast.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+            toast.innerText = msg;
+            
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        }
+
         // Real-time configuration change handler from native LauncherConfigManager
         window.onConfigChanged = function(jsonStr) {
             try {
@@ -1109,10 +1381,12 @@
 
         // Initialize App Hub
         function init() {
+            restoreThemeOnColdBoot();
             loadInstantWebCache();
             fetchFreshNativeApps();
             fetchNotifications();
             checkInitialSyncStatus();
+            loadMarketplaceData();
             // High refresh rate real-time bridge synchronization (2s intervals)
             setInterval(fetchNotifications, 2000);
             // Periodic battery / sync verification (10s intervals)

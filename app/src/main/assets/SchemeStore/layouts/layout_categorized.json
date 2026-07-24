@@ -1,0 +1,7 @@
+{
+  "id": "layout_categorized",
+  "name": "Smart Categorized",
+  "author": "Piuu Core",
+  "description": "Auto-groups application icons into smart folders using lightweight NLP rules",
+  "layout_name": "categorized"
+}

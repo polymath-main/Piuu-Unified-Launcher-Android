@@ -1,0 +1,15 @@
+{
+  "id": "theme_forest",
+  "name": "Forest Moss",
+  "bg_color": "#062f1e",
+  "card_bg": "rgba(16, 185, 129, 0.12)",
+  "card_border": "rgba(245, 158, 11, 0.25)",
+  "text_primary": "#10b981",
+  "text_secondary": "#f59e0b",
+  "primary_blue": "#10b981",
+  "accent_purple": "#84cc16",
+  "glass_blur": "blur(12px)",
+  "icon_size": "52px",
+  "drawer_columns": "4",
+  "card_opacity": "0.85"
+}

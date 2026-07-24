@@ -1,0 +1,15 @@
+{
+  "id": "theme_oled",
+  "name": "Midnight OLED",
+  "bg_color": "#000000",
+  "card_bg": "rgba(18, 18, 18, 0.8)",
+  "card_border": "rgba(255, 255, 255, 0.15)",
+  "text_primary": "#ffffff",
+  "text_secondary": "#888888",
+  "primary_blue": "#3b82f6",
+  "accent_purple": "#ffffff",
+  "glass_blur": "none",
+  "icon_size": "52px",
+  "drawer_columns": "4",
+  "card_opacity": "0.98"
+}
