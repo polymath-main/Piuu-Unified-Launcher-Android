@@ -58,6 +58,7 @@ fun HybridWebViewComposable(
             if (prewarmed != null) {
                 // Ensure it is detached from any previous virtual layout before adding to Compose
                 (prewarmed.parent as? ViewGroup)?.removeView(prewarmed)
+                jsBridge.wallpaperHandler.applyWallpaperToWebView(prewarmed)
                 webViewRef = prewarmed
                 prewarmed
             } else {
@@ -75,6 +76,8 @@ fun HybridWebViewComposable(
                     optimizeWebViewSettings(this)
 
                     addJavascriptInterface(jsBridge, "AndroidLauncherBridge")
+
+                    jsBridge.wallpaperHandler.applyWallpaperToWebView(this)
 
                     webViewClient = object : WebViewClient() {
                         override fun shouldInterceptRequest(

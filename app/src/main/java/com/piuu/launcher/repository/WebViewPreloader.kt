@@ -76,6 +76,8 @@ object WebViewPreloader {
                     activeLaunchCallback?.invoke(packageName, appName)
                 }
                 webView.addJavascriptInterface(jsBridge, "AndroidLauncherBridge")
+                
+                jsBridge.wallpaperHandler.applyWallpaperToWebView(webView)
 
                 // 4. Asset loader routing
                 val assetLoader = WebViewAssetLoader.Builder()

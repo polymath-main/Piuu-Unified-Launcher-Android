@@ -6,6 +6,8 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -34,10 +36,21 @@ class MainActivity : ComponentActivity() {
     @androidx.webkit.WebViewCompat.ExperimentalAsyncStartUp
     @android.annotation.SuppressLint("WrongConstant")
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         super.onCreate(savedInstanceState)
 
         // Configure hardware acceleration, window margins, and high refresh rate
         latencyManager.configureWindowForSmoothScrolling(this)
+
+        // Set wallpaper flags to show live/system wallpaper behind the transparent window background
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+
+        // Let the content layout in the display cutout/notch area so there are no black bands around the notch
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            window.attributes.layoutInDisplayCutoutMode = 
+                android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
 
         repository = LauncherRepository(applicationContext)
 
@@ -120,6 +133,9 @@ fun LauncherAppMain(
     var apps by remember { mutableStateOf(repository.getApps()) }
     var notes by remember { mutableStateOf(repository.getNotes()) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val configManager = remember { com.piuu.launcher.repository.LauncherConfigManager.getInstance(context) }
+    var configState by remember { mutableStateOf(configManager.config) }
+
     val notificationBridge = remember { NotificationBridge.getInstance(context) }
     val notifications by notificationBridge.notificationsFlow.collectAsState()
     val marketplaceCatalog = remember { repository.marketplaceCatalog }
@@ -145,6 +161,7 @@ fun LauncherAppMain(
     var showMetrics by remember { mutableStateOf(false) }
     var showSchemaEditor by remember { mutableStateOf(false) }
     var showWebView by remember { mutableStateOf(false) }
+    var showQuickSettings by remember { mutableStateOf(false) }
 
     // Reset Callback for HOME key press
     LaunchedEffect(Unit) {
@@ -156,11 +173,12 @@ fun LauncherAppMain(
             showMetrics = false
             showSchemaEditor = false
             showWebView = false
+            showQuickSettings = false
         }
     }
 
     // Back Button Handler: Close open sheets or do nothing (stay on home launcher)
-    val isAnyOverlayOpen = showDrawer || showBrainChat || showSearch || showMarketplace || showMetrics || showSchemaEditor || showWebView
+    val isAnyOverlayOpen = showDrawer || showBrainChat || showSearch || showMarketplace || showMetrics || showSchemaEditor || showWebView || showQuickSettings
     BackHandler(enabled = isAnyOverlayOpen) {
         showDrawer = false
         showBrainChat = false
@@ -169,6 +187,7 @@ fun LauncherAppMain(
         showMetrics = false
         showSchemaEditor = false
         showWebView = false
+        showQuickSettings = false
     }
 
     // Launch App helper with LatencyManager ultra-low latency bridge
@@ -202,9 +221,14 @@ fun LauncherAppMain(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF020817))
+            .background(if (configState.showSystemWallpaper) Color.Transparent else Color(0xFF020817))
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+        ) {
             // Header Status Bar & Quick Actions
             HeaderBar(
                 metrics = metrics,
@@ -213,7 +237,8 @@ fun LauncherAppMain(
                 onOpenMarketplace = { showMarketplace = true },
                 onOpenMetrics = { showMetrics = true },
                 onOpenSchemaEditor = { showSchemaEditor = true },
-                onOpenWebView = { showWebView = true }
+                onOpenWebView = { showWebView = true },
+                onOpenQuickSettings = { showQuickSettings = true }
             )
 
             // Main Pager Home Screen
@@ -433,5 +458,55 @@ fun LauncherAppMain(
                 }
             }
         }
+
+        // Control Center & Quick Settings Shade
+        QuickSettingsShade(
+            visible = showQuickSettings,
+            metrics = metrics,
+            notifications = notifications,
+            showSystemWallpaper = configState.showSystemWallpaper,
+            onToggleWallpaper = {
+                val updatedVal = !configState.showSystemWallpaper
+                configManager.setWallpaperEnabled(updatedVal)
+                configState = configManager.config
+                Toast.makeText(context, if (updatedVal) "System wallpaper enabled" else "System wallpaper disabled", Toast.LENGTH_SHORT).show()
+            },
+            onChangeWallpaper = {
+                val intent = Intent(Intent.ACTION_SET_WALLPAPER)
+                try {
+                    context.startActivity(Intent.createChooser(intent, "Choose Wallpaper Source"))
+                } catch (e: Exception) {
+                    Toast.makeText(context, "No system wallpaper app found", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onDismiss = { showQuickSettings = false },
+            onToggleWifi = {
+                metrics = metrics.copy(wifi_enabled = !metrics.wifi_enabled)
+            },
+            onToggleBluetooth = {
+                metrics = metrics.copy(bluetooth_enabled = !metrics.bluetooth_enabled)
+            },
+            onToggleFlashlight = {
+                metrics = metrics.copy(flashlight_enabled = !metrics.flashlight_enabled)
+            },
+            onToggleBatterySaver = {
+                metrics = metrics.copy(battery_saver = !metrics.battery_saver)
+            },
+            onToggleDnd = {
+                metrics = metrics.copy(do_not_disturb = !metrics.do_not_disturb)
+            },
+            onClearNotifications = {
+                notificationBridge.clearAllNotifications()
+            },
+            onScanApps = {
+                val scanned = repository.scanAndSaveInstalledApps(context)
+                if (scanned.isNotEmpty()) {
+                    apps = scanned
+                    Toast.makeText(context, "Successfully imported ${scanned.size} apps!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "No apps found, keeping defaults", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
     }
 }

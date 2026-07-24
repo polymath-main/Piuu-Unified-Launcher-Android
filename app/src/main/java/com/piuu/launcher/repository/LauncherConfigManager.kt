@@ -12,7 +12,8 @@ data class LauncherConfig(
     val homeColumns: Int = 4,
     val homeRows: Int = 6,
     val drawerColumns: Int = 4,
-    val backgroundTransparency: Float = 0.85f // 0.0 to 1.0
+    val backgroundTransparency: Float = 0.85f, // 0.0 to 1.0
+    val showSystemWallpaper: Boolean = true
 )
 
 class LauncherConfigManager(private val context: Context) {
@@ -26,7 +27,8 @@ class LauncherConfigManager(private val context: Context) {
             homeColumns = prefs.getInt("home_columns", 4),
             homeRows = prefs.getInt("home_rows", 6),
             drawerColumns = prefs.getInt("drawer_columns", 4),
-            backgroundTransparency = prefs.getFloat("bg_transparency", 0.85f)
+            backgroundTransparency = prefs.getFloat("bg_transparency", 0.85f),
+            showSystemWallpaper = prefs.getBoolean("show_system_wallpaper", true)
         )
         set(value) {
             prefs.edit()
@@ -37,6 +39,7 @@ class LauncherConfigManager(private val context: Context) {
                 .putInt("home_rows", value.homeRows)
                 .putInt("drawer_columns", value.drawerColumns)
                 .putFloat("bg_transparency", value.backgroundTransparency)
+                .putBoolean("show_system_wallpaper", value.showSystemWallpaper)
                 .apply()
         }
 
@@ -50,7 +53,13 @@ class LauncherConfigManager(private val context: Context) {
         json.put("homeRows", c.homeRows)
         json.put("drawerColumns", c.drawerColumns)
         json.put("backgroundTransparency", c.backgroundTransparency.toDouble())
+        json.put("showSystemWallpaper", c.showSystemWallpaper)
         return json.toString()
+    }
+
+    fun setWallpaperEnabled(enabled: Boolean) {
+        val current = config
+        config = current.copy(showSystemWallpaper = enabled)
     }
 
     fun updateConfigFromJson(jsonStr: String, webView: WebView?) {
@@ -64,7 +73,8 @@ class LauncherConfigManager(private val context: Context) {
                 homeColumns = json.optInt("homeColumns", current.homeColumns),
                 homeRows = json.optInt("homeRows", current.homeRows),
                 drawerColumns = json.optInt("drawerColumns", current.drawerColumns),
-                backgroundTransparency = json.optDouble("backgroundTransparency", current.backgroundTransparency.toDouble()).toFloat()
+                backgroundTransparency = json.optDouble("backgroundTransparency", current.backgroundTransparency.toDouble()).toFloat(),
+                showSystemWallpaper = json.optBoolean("showSystemWallpaper", current.showSystemWallpaper)
             )
             config = updated
 

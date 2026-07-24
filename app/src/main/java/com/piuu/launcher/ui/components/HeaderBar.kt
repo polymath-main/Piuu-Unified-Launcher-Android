@@ -30,7 +30,8 @@ fun HeaderBar(
     onOpenMarketplace: () -> Unit,
     onOpenMetrics: () -> Unit,
     onOpenSchemaEditor: () -> Unit,
-    onOpenWebView: () -> Unit = {}
+    onOpenWebView: () -> Unit = {},
+    onOpenQuickSettings: () -> Unit = {}
 ) {
     val currentTime = SimpleDateFormat("HH:mm", Locale.US).format(Date())
 
@@ -192,6 +193,16 @@ fun HeaderBar(
                         imageVector = Icons.Default.Language,
                         contentDescription = "WebView Drawer",
                         tint = PrimaryBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // Quick Settings / Control Center
+                IconButton(onClick = onOpenQuickSettings, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = "Control Center",
+                        tint = AccentPurple,
                         modifier = Modifier.size(20.dp)
                     )
                 }

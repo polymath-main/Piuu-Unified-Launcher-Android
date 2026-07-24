@@ -32,6 +32,12 @@ class LauncherJsBridge(
 ) {
     private val gson = Gson()
     private val iconLoader = UniversalIconLoader(context)
+    val wallpaperHandler = WallpaperHandler(context)
+
+    @JavascriptInterface
+    fun getSystemWallpaperBase64(): String {
+        return wallpaperHandler.getWallpaperBase64()
+    }
 
     @JavascriptInterface
     fun getInstalledAppsJson(): String {

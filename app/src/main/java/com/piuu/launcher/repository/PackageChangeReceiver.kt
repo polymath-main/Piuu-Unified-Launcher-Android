@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import com.piuu.launcher.model.SystemApp
 
@@ -29,11 +31,16 @@ class PackageChangeReceiver : BroadcastReceiver() {
             val repository = LauncherRepository(context)
             val pm = context.packageManager
 
-            // Query system PackageManager for all launcher activities
+            // Query system PackageManager for all launcher activities with Android 16 compatibility
             val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
             }
-            val resolvedApps = pm.queryIntentActivities(mainIntent, 0)
+            val resolvedApps = if (Build.VERSION.SDK_INT >= 33) {
+                pm.queryIntentActivities(mainIntent, PackageManager.ResolveInfoFlags.of(0L))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.queryIntentActivities(mainIntent, 0)
+            }
 
             val currentSavedApps = repository.getApps().associateBy { it.package_name }
             val updatedAppsList = mutableListOf<SystemApp>()

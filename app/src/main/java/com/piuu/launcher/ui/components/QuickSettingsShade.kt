@@ -5,8 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,15 +31,79 @@ fun QuickSettingsShade(
     visible: Boolean,
     metrics: SystemMetrics,
     notifications: List<NotificationItem>,
+    showSystemWallpaper: Boolean,
+    onToggleWallpaper: () -> Unit,
+    onChangeWallpaper: () -> Unit,
     onDismiss: () -> Unit,
     onToggleWifi: () -> Unit,
     onToggleBluetooth: () -> Unit,
     onToggleFlashlight: () -> Unit,
     onToggleBatterySaver: () -> Unit,
     onToggleDnd: () -> Unit,
-    onClearNotifications: () -> Unit
+    onClearNotifications: () -> Unit,
+    onScanApps: () -> Unit
 ) {
     if (!visible) return
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Real Permission state trackers for Production-Grade gateway
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.CAMERA
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    var hasNotificationPermission by remember {
+        mutableStateOf(
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    "android.permission.POST_NOTIFICATIONS"
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+        )
+    }
+
+    var hasStoragePermission by remember {
+        mutableStateOf(
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.READ_MEDIA_IMAGES
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            } else {
+                androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.READ_EXTERNAL_STORAGE
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
+        )
+    }
+
+    // Permission launchers
+    val cameraPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasCameraPermission = isGranted
+    }
+
+    val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasNotificationPermission = isGranted
+    }
+
+    val storagePermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasStoragePermission = isGranted
+    }
 
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
@@ -55,161 +119,216 @@ fun QuickSettingsShade(
                     .statusBarsPadding()
                     .navigationBarsPadding()
                     .padding(horizontal = 20.dp, vertical = 16.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Control Center & Notifications",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-                IconButton(onClick = onDismiss) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Quick Toggles Grid (2x3)
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    QuickToggleTile(
-                        title = "Wi-Fi",
-                        subtitle = if (metrics.wifi_enabled) "Connected (5G)" else "Off",
-                        icon = Icons.Default.Wifi,
-                        active = metrics.wifi_enabled,
-                        activeColor = PrimaryBlue,
-                        modifier = Modifier.weight(1f),
-                        onClick = onToggleWifi
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Control Center & Settings",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
                     )
-                    QuickToggleTile(
-                        title = "Bluetooth",
-                        subtitle = if (metrics.bluetooth_enabled) "On (Headphones)" else "Off",
-                        icon = Icons.Default.Bluetooth,
-                        active = metrics.bluetooth_enabled,
-                        activeColor = AccentPurple,
-                        modifier = Modifier.weight(1f),
-                        onClick = onToggleBluetooth
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    QuickToggleTile(
-                        title = "Flashlight",
-                        subtitle = if (metrics.flashlight_enabled) "On" else "Off",
-                        icon = Icons.Default.FlashOn,
-                        active = metrics.flashlight_enabled,
-                        activeColor = WarningAmber,
-                        modifier = Modifier.weight(1f),
-                        onClick = onToggleFlashlight
-                    )
-                    QuickToggleTile(
-                        title = "Battery Saver",
-                        subtitle = if (metrics.battery_saver) "Active" else "Standard",
-                        icon = Icons.Default.BatterySaver,
-                        active = metrics.battery_saver,
-                        activeColor = SuccessGreen,
-                        modifier = Modifier.weight(1f),
-                        onClick = onToggleBatterySaver
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    QuickToggleTile(
-                        title = "Do Not Disturb",
-                        subtitle = if (metrics.do_not_disturb) "Silent" else "Off",
-                        icon = Icons.Default.DoNotDisturbOn,
-                        active = metrics.do_not_disturb,
-                        activeColor = DangerRed,
-                        modifier = Modifier.weight(1f),
-                        onClick = onToggleDnd
-                    )
-                    QuickToggleTile(
-                        title = "Location",
-                        subtitle = "High Accuracy",
-                        icon = Icons.Default.LocationOn,
-                        active = true,
-                        activeColor = PrimaryBlue,
-                        modifier = Modifier.weight(1f),
-                        onClick = {}
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // System Metrics Card
-            Card(
-                colors = CardDefaults.cardColors(containerColor = CardGlassBg),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, LauncherBorder, RoundedCornerShape(20.dp))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Live System Health", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
-                        MetricItem(title = "CPU", value = "${metrics.cpu_usage}%", color = PrimaryBlue)
-                        MetricItem(title = "RAM", value = "${metrics.ram_used_mb} GB / ${metrics.ram_total_mb} GB", color = AccentPurple)
-                        MetricItem(title = "Battery", value = "${metrics.battery_pct}%", color = SuccessGreen)
-                        MetricItem(title = "Network", value = "${(metrics.network_speed_kbps / 1000).toInt()} MB/s", color = WarningAmber)
+                    IconButton(onClick = onDismiss) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // Notifications Section
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Notifications (${notifications.size})",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-                if (notifications.isNotEmpty()) {
-                    TextTextButton(text = "Clear All", onClick = onClearNotifications)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (notifications.isEmpty()) {
-                Box(
+                // App Scanning & Syncing Card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                    shape = RoundedCornerShape(20.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(100.dp),
-                    contentAlignment = Alignment.Center
+                        .border(1.dp, LauncherBorder, RoundedCornerShape(20.dp))
                 ) {
-                    Text("No new notifications", color = TextMuted, fontSize = 14.sp)
-                }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 220.dp)
-                ) {
-                    items(notifications) { notif ->
-                        NotificationCardItem(item = notif)
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Application Management", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Import Installed Apps", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                Text("Scan device Package Manager for launcher applications on Android 16", fontSize = 11.sp, color = TextSecondary)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = onScanApps,
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentPurple),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Scan & Import System Apps", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Wallpaper Config Card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, LauncherBorder, RoundedCornerShape(20.dp))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Live Wallpaper Options", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Show System Wallpaper", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                Text("Renders the Android system wallpaper behind homescreen surfaces", fontSize = 11.sp, color = TextSecondary)
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Switch(
+                                checked = showSystemWallpaper,
+                                onCheckedChange = { onToggleWallpaper() },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = PrimaryBlue,
+                                    checkedTrackColor = PrimaryBlue.copy(alpha = 0.4f)
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = onChangeWallpaper,
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(imageVector = Icons.Default.Wallpaper, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Change System Wallpaper Intent", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Live Permissions Gateway Card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, LauncherBorder, RoundedCornerShape(20.dp))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Permissions Gateway", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text("Keep operations secure & crash-free", fontSize = 11.sp, color = TextSecondary)
+                            }
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = null,
+                                tint = SuccessGreen,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        PermissionRowItem(
+                            title = "Notifications Access",
+                            description = "Needed to feed system alerts in Control Center.",
+                            isGranted = hasNotificationPermission,
+                            onRequest = {
+                                if (android.os.Build.VERSION.SDK_INT >= 33) {
+                                    notificationPermissionLauncher.launch("android.permission.POST_NOTIFICATIONS")
+                                }
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        PermissionRowItem(
+                            title = "Media Storage Access",
+                            description = "Required to import custom icon packs & wallpapers.",
+                            isGranted = hasStoragePermission,
+                            onRequest = {
+                                if (android.os.Build.VERSION.SDK_INT >= 33) {
+                                    storagePermissionLauncher.launch(android.Manifest.permission.READ_MEDIA_IMAGES)
+                                } else {
+                                    storagePermissionLauncher.launch(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+                                }
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        PermissionRowItem(
+                            title = "Camera Hardware Access",
+                            description = "Required for flashlight controller toggle features.",
+                            isGranted = hasCameraPermission,
+                            onRequest = {
+                                cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // System Metrics Card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, LauncherBorder, RoundedCornerShape(20.dp))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Live System Health", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround
+                        ) {
+                            MetricItem(title = "CPU", value = "${metrics.cpu_usage}%", color = PrimaryBlue)
+                            MetricItem(title = "RAM", value = "${metrics.ram_used_mb} GB / ${metrics.ram_total_mb} GB", color = AccentPurple)
+                            MetricItem(title = "Battery", value = "${metrics.battery_pct}%", color = SuccessGreen)
+                            MetricItem(title = "Network", value = "${(metrics.network_speed_kbps / 1000).toInt()} MB/s", color = WarningAmber)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
-}
 }
 
 @Composable
@@ -319,4 +438,44 @@ fun TextTextButton(text: String, onClick: () -> Unit) {
         color = PrimaryBlue,
         modifier = Modifier.clickable { onClick() }
     )
+}
+
+@Composable
+fun PermissionRowItem(
+    title: String,
+    description: String,
+    isGranted: Boolean,
+    onRequest: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+            Text(text = description, fontSize = 11.sp, color = TextSecondary)
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        if (isGranted) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(SuccessGreen.copy(alpha = 0.2f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text("Granted", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        } else {
+            Button(
+                onClick = onRequest,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.height(28.dp)
+            ) {
+                Text("Grant", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        }
+    }
 }

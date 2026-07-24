@@ -19,16 +19,12 @@ jobs:
       with:
         node-version: '20'
 
-    - name: Build Web Application Assets
+    - name: Build Web Application
       run: |
         npm install
         npm run build
-        # Force-create the target directory structure to prevent directory copy faults
         mkdir -p app/src/main/assets/public
-        # Execute structural replication matching AI Studio definitions
         cp -r dist/* app/src/main/assets/public/
-        # Output directory validation check
-        ls -la app/src/main/assets/public/
 
     - name: Set up JDK 21
       uses: actions/setup-java@v4
@@ -66,4 +62,3 @@ jobs:
       with:
         name: app-debug-apk
         path: app/build/outputs/apk/debug/app-debug.apk
-        

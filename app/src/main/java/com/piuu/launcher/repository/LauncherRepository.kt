@@ -1,7 +1,12 @@
 package com.piuu.launcher.repository
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.os.Build
+import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.piuu.launcher.model.*
@@ -119,8 +124,99 @@ class LauncherRepository(private val context: Context) {
                 e.printStackTrace()
             }
         }
+        
+        // Scan and import real device applications on first-run startup
+        val scanned = scanAndSaveInstalledApps(context)
+        if (scanned.isNotEmpty()) {
+            return scanned
+        }
+        
         saveApps(defaultApps)
         return defaultApps
+    }
+
+    fun scanAndSaveInstalledApps(ctx: Context): List<SystemApp> {
+        try {
+            val pm = ctx.packageManager
+            val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+            }
+
+            val resolvedApps = if (Build.VERSION.SDK_INT >= 33) {
+                pm.queryIntentActivities(mainIntent, PackageManager.ResolveInfoFlags.of(0L))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.queryIntentActivities(mainIntent, 0)
+            }
+
+            val currentSavedApps = try {
+                val json = prefs.getString("installed_apps", null)
+                if (json != null) {
+                    val type = object : TypeToken<List<SystemApp>>() {}.type
+                    gson.fromJson<List<SystemApp>>(json, type).associateBy { it.package_name }
+                } else {
+                    emptyMap()
+                }
+            } catch (e: Exception) {
+                emptyMap()
+            }
+
+            val updatedAppsList = mutableListOf<SystemApp>()
+
+            for (resolveInfo in resolvedApps) {
+                val pkgName = resolveInfo.activityInfo.packageName
+                // Skip this launcher application from appearing in the user's app drawer
+                if (pkgName == ctx.packageName) continue
+
+                val label = resolveInfo.loadLabel(pm).toString()
+
+                val existing = currentSavedApps[pkgName]
+                if (existing != null) {
+                    updatedAppsList.add(existing.copy(name = label))
+                } else {
+                    val isSystem = (resolveInfo.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                    val category = if (isSystem) "system" else "user"
+                    val colorHex = stringToHexColor(pkgName)
+                    updatedAppsList.add(
+                        SystemApp(
+                            package_name = pkgName,
+                            name = label,
+                            icon_name = "apps",
+                            category = category,
+                            launch_intent = "intent://$pkgName",
+                            usage_count = 0,
+                            badge_count = 0,
+                            is_favorite = false,
+                            accent_color = colorHex,
+                            description = "Installed Application ($pkgName)"
+                        )
+                    )
+                }
+            }
+
+            // Retain Piuu suite built-in entries
+            for (defaultApp in defaultApps) {
+                if (defaultApp.package_name.startsWith("com.piuu.") && updatedAppsList.none { it.package_name == defaultApp.package_name }) {
+                    updatedAppsList.add(defaultApp)
+                }
+            }
+
+            if (updatedAppsList.isNotEmpty()) {
+                saveApps(updatedAppsList)
+                return updatedAppsList
+            }
+        } catch (e: Exception) {
+            Log.e("LauncherRepository", "Failed to scan device packages", e)
+        }
+        return emptyList()
+    }
+
+    private fun stringToHexColor(str: String): String {
+        val hash = str.hashCode()
+        val r = (hash and 0xFF0000) shr 16
+        val g = (hash and 0x00FF00) shr 8
+        val b = hash and 0x0000FF
+        return String.format("#%02X%02X%02X", (r + 100) % 256, (g + 100) % 256, (b + 100) % 256)
     }
 
     fun saveApps(apps: List<SystemApp>) {
