@@ -33,114 +33,31 @@ fun HeaderBar(
     onOpenWebView: () -> Unit = {},
     onOpenQuickSettings: () -> Unit = {}
 ) {
-    val currentTime = SimpleDateFormat("HH:mm", Locale.US).format(Date())
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.Transparent)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
     ) {
-        // Top status row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Left: Time & Carrier / Launcher title
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = currentTime,
-                    color = TextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Box(
-                    modifier = Modifier
-                        .size(4.dp)
-                        .clip(CircleShape)
-                        .background(TextMuted)
-                )
-                Text(
-                    text = "5G • Piuu Launcher",
-                    color = TextSecondary,
-                    fontSize = 12.sp
-                )
-            }
-
-            // Right: Network, Battery, Notifications
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Wifi,
-                    contentDescription = "WiFi",
-                    tint = TextPrimary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = if (metrics.battery_pct > 80) Icons.Default.BatteryFull
-                        else if (metrics.battery_pct > 30) Icons.Default.Battery4Bar
-                        else Icons.Default.Battery1Bar,
-                        contentDescription = "Battery",
-                        tint = if (metrics.battery_pct < 20) DangerRed else SuccessGreen,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "${metrics.battery_pct}%",
-                        color = TextPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Launcher Toolbar Row (Search, Brain AI, Marketplace, Metrics, Schema Editor, Quick Settings pull handle)
+        // Launcher Toolbar Row (Search Icon Only, Brain AI, Marketplace, Metrics, Schema Editor, Quick Settings pull handle)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
                 .background(LauncherGlass)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Search field button
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0x22FFFFFF))
-                    .clickable { onOpenSearch() }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            // Search Icon Only
+            IconButton(onClick = onOpenSearch, modifier = Modifier.size(36.dp)) {
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = "Search",
                     tint = PrimaryBlue,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = "Search apps, actions or AI...",
-                    color = TextSecondary,
-                    fontSize = 13.sp
+                    modifier = Modifier.size(20.dp)
                 )
             }
-
-            Spacer(modifier = Modifier.width(8.dp))
 
             // Action Quick Icons
             Row(

@@ -249,7 +249,13 @@ fun LauncherAppMain(
                 notes = notes,
                 onLaunchApp = handleLaunchApp,
                 onOpenDrawer = { showDrawer = true },
+                onOpenSearch = { showSearch = true },
                 onOpenBrainChat = { showBrainChat = true },
+                onOpenQuickSettings = { showQuickSettings = true },
+                onOpenWebView = { showWebView = true },
+                onOpenMarketplace = { showMarketplace = true },
+                onOpenMetrics = { showMetrics = true },
+                onOpenSchemaEditor = { showSchemaEditor = true },
                 onOpenFolder = { showDrawer = true },
                 onAddNote = { text ->
                     val updated = notes.toMutableList().apply {
@@ -312,50 +318,103 @@ fun LauncherAppMain(
         // Marketplace Catalog
         MarketplaceModal(
             visible = showMarketplace,
-            catalog = marketplaceCatalog,
+            catalog = repository.getMarketplaceCatalog(schema),
+            aiEngine = aiEngine,
             onDismiss = { showMarketplace = false },
+            onApplyAiTheme = { aiTheme ->
+                val updatedSchema = schema.copy(theme = aiTheme)
+                schema = updatedSchema
+                repository.saveSchema(updatedSchema)
+                Toast.makeText(context, "AI Theme '${aiTheme.name}' Applied!", Toast.LENGTH_SHORT).show()
+                showMarketplace = false
+            },
             onInstallItem = { item ->
-                // Update catalog installed states in memory
-                marketplaceCatalog.forEach { catItem ->
-                    if (catItem.category.equals(item.category, ignoreCase = true)) {
-                        catItem.is_installed = (catItem.id == item.id)
-                    }
-                }
-                
-                // Update schema based on selected plugin
                 val currentTheme = schema.theme
                 var updatedTheme = currentTheme
                 var updatedSchema = schema
 
                 when (item.category.lowercase()) {
-                    "theming" -> {
-                        val (primary, accent, bg) = when (item.id) {
-                            "theme_nord" -> Triple("#3B82F6", "#8B5CF6", "rgba(2, 8, 23, 0.85)")
-                            "theme_cyberpunk" -> Triple("#EC4899", "#06B6D4", "rgba(9, 9, 11, 0.9)")
-                            "theme_slate" -> Triple("#64748B", "#94A3B8", "rgba(18, 18, 18, 0.92)")
-                            "theme_sunset" -> Triple("#F97316", "#A855F7", "rgba(30, 17, 42, 0.88)")
-                            else -> Triple("#3B82F6", "#8B5CF6", "rgba(2, 8, 23, 0.85)")
+                    "theming", "themes" -> {
+                        var primary = "#3B82F6"
+                        var accent = "#8B5CF6"
+                        var bg = "rgba(2, 8, 23, 0.85)"
+                        var font = currentTheme.font_family
+
+                        if (!item.payload.isNullOrBlank()) {
+                            try {
+                                val json = org.json.JSONObject(item.payload)
+                                if (json.has("primary_blue")) primary = json.getString("primary_blue")
+                                else if (json.has("primary_color")) primary = json.getString("primary_color")
+
+                                if (json.has("accent_purple")) accent = json.getString("accent_purple")
+                                else if (json.has("accent_color")) accent = json.getString("accent_color")
+
+                                if (json.has("bg_color")) bg = json.getString("bg_color")
+                                else if (json.has("bg_overlay")) bg = json.getString("bg_overlay")
+                                else if (json.has("card_bg")) bg = json.getString("card_bg")
+
+                                if (json.has("font_family")) font = json.getString("font_family")
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        } else {
+                            val tuple = when (item.id) {
+                                "theme_nord" -> Triple("#3B82F6", "#8B5CF6", "rgba(2, 8, 23, 0.85)")
+                                "theme_cyberpunk" -> Triple("#EC4899", "#06B6D4", "rgba(9, 9, 11, 0.9)")
+                                "theme_slate" -> Triple("#64748B", "#94A3B8", "rgba(18, 18, 18, 0.92)")
+                                "theme_sunset" -> Triple("#F97316", "#A855F7", "rgba(30, 17, 42, 0.88)")
+                                else -> Triple("#3B82F6", "#8B5CF6", "rgba(2, 8, 23, 0.85)")
+                            }
+                            primary = tuple.first
+                            accent = tuple.second
+                            bg = tuple.third
                         }
+
                         updatedTheme = currentTheme.copy(
                             id = item.id,
                             name = item.name,
                             primary_color = primary,
                             accent_color = accent,
-                            bg_overlay = bg
+                            bg_overlay = bg,
+                            font_family = font
                         )
                         updatedSchema = schema.copy(theme = updatedTheme)
                     }
                     "fonts" -> {
-                        val fontName = item.payload ?: "Inter"
+                        var fontName = item.id
+                        if (!item.payload.isNullOrBlank()) {
+                            try {
+                                val json = org.json.JSONObject(item.payload)
+                                if (json.has("font_family")) fontName = json.getString("font_family")
+                            } catch (e: Exception) {
+                                fontName = item.payload
+                            }
+                        }
                         updatedTheme = currentTheme.copy(font_family = fontName)
                         updatedSchema = schema.copy(theme = updatedTheme, active_font = fontName)
                     }
                     "layouts" -> {
-                        val layoutName = item.payload ?: "categorized"
+                        var layoutName = item.id
+                        if (!item.payload.isNullOrBlank()) {
+                            try {
+                                val json = org.json.JSONObject(item.payload)
+                                if (json.has("layout_name")) layoutName = json.getString("layout_name")
+                            } catch (e: Exception) {
+                                layoutName = item.payload
+                            }
+                        }
                         updatedSchema = schema.copy(drawer_layout = layoutName)
                     }
                     "icons" -> {
-                        val packName = item.payload ?: "default"
+                        var packName = item.id
+                        if (!item.payload.isNullOrBlank()) {
+                            try {
+                                val json = org.json.JSONObject(item.payload)
+                                if (json.has("icon_pack_name")) packName = json.getString("icon_pack_name")
+                            } catch (e: Exception) {
+                                packName = item.payload
+                            }
+                        }
                         updatedSchema = schema.copy(active_icon_pack = packName)
                     }
                     else -> {
@@ -369,7 +428,7 @@ fun LauncherAppMain(
 
                 schema = updatedSchema
                 repository.saveSchema(updatedSchema)
-                Toast.makeText(context, "Applied ${item.name}!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Applied ${item.name} Scheme!", Toast.LENGTH_SHORT).show()
                 showMarketplace = false
             }
         )

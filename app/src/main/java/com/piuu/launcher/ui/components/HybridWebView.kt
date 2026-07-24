@@ -54,60 +54,97 @@ fun HybridWebViewComposable(
     AndroidView(
         factory = { ctx ->
             // 1. ATTEMPT TO RETRIEVE PRE-WARMED WEBVIEW
-            val prewarmed = com.piuu.launcher.repository.WebViewPreloader.getPrewarmedWebView(onLaunchApp)
-            if (prewarmed != null) {
-                // Ensure it is detached from any previous virtual layout before adding to Compose
-                (prewarmed.parent as? ViewGroup)?.removeView(prewarmed)
-                jsBridge.wallpaperHandler.applyWallpaperToWebView(prewarmed)
-                webViewRef = prewarmed
-                prewarmed
-            } else {
-                // 2. FALLBACK ON-DEMAND CREATION IF NOT READY
-                WebView(ctx).apply {
-                    webViewRef = this
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
+            val targetWebView = com.piuu.launcher.repository.WebViewPreloader.getPrewarmedWebView(onLaunchApp) ?: WebView(ctx).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
 
-                    // Enable Hardware layer for entrance animation
-                    setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                // Enable Hardware layer for entrance animation
+                setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
-                    optimizeWebViewSettings(this)
+                optimizeWebViewSettings(this)
 
-                    addJavascriptInterface(jsBridge, "AndroidLauncherBridge")
+                addJavascriptInterface(jsBridge, "AndroidLauncherBridge")
 
-                    jsBridge.wallpaperHandler.applyWallpaperToWebView(this)
+                jsBridge.wallpaperHandler.applyWallpaperToWebView(this)
 
-                    webViewClient = object : WebViewClient() {
-                        override fun shouldInterceptRequest(
-                            view: WebView,
-                            request: WebResourceRequest
-                        ): WebResourceResponse? {
-                            return assetLoader.shouldInterceptRequest(request.url)
-                        }
-
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            super.onPageFinished(view, url)
-                            
-                            // Reclaim hardware layer memory by reverting to LAYER_TYPE_NONE after loading/animation completes
-                            view?.postDelayed({
-                                try {
-                                    view.setLayerType(View.LAYER_TYPE_NONE, null)
-                                    android.util.Log.d("HybridWebView", "Hardware layer set to NONE to reclaim video memory")
-                                } catch (e: Exception) {
-                                    android.util.Log.e("HybridWebView", "Error setting hardware layer to NONE", e)
-                                }
-                            }, 1200)
-
-                            // Trigger GC sparingly after complete page load
-                            System.gc()
-                        }
+                webViewClient = object : WebViewClient() {
+                    override fun shouldInterceptRequest(
+                        view: WebView,
+                        request: WebResourceRequest
+                    ): WebResourceResponse? {
+                        return assetLoader.shouldInterceptRequest(request.url)
                     }
 
-                    loadUrl("https://appassets.androidplatform.net/assets/index.html")
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        super.onPageFinished(view, url)
+                        
+                        view?.postDelayed({
+                            try {
+                                view.setLayerType(View.LAYER_TYPE_NONE, null)
+                                android.util.Log.d("HybridWebView", "Hardware layer set to NONE to reclaim video memory")
+                            } catch (e: Exception) {
+                                android.util.Log.e("HybridWebView", "Error setting hardware layer to NONE", e)
+                            }
+                        }, 1200)
+
+                        System.gc()
+                    }
                 }
+
+                loadUrl("https://appassets.androidplatform.net/assets/index.html")
             }
+
+            (targetWebView.parent as? ViewGroup)?.removeView(targetWebView)
+            jsBridge.wallpaperHandler.applyWallpaperToWebView(targetWebView)
+            webViewRef = targetWebView
+
+            // 2. Wrap WebView in SwipeRefreshLayout for Pull-To-Refresh
+            val swipeRefreshLayout = androidx.swiperefreshlayout.widget.SwipeRefreshLayout(ctx).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                setColorSchemeColors(
+                    android.graphics.Color.parseColor("#3B82F6"),
+                    android.graphics.Color.parseColor("#8B5CF6")
+                )
+                setProgressBackgroundColorSchemeColor(android.graphics.Color.parseColor("#1E293B"))
+
+                setOnChildScrollUpCallback { _, _ ->
+                    targetWebView.scrollY > 0
+                }
+
+                setOnRefreshListener {
+                    // Rescan device packages
+                    repository.scanAndSaveInstalledApps(ctx)
+
+                    // Force trigger fetchFreshNativeApps in WebView JavaScript environment
+                    targetWebView.evaluateJavascript(
+                        """
+                        (function() {
+                            if (typeof fetchFreshNativeApps === 'function') {
+                                fetchFreshNativeApps();
+                            } else if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.fetchFreshNativeApps === 'function') {
+                                window.AndroidLauncherBridge.fetchFreshNativeApps();
+                            } else if (typeof onPackageChanged === 'function') {
+                                onPackageChanged();
+                            }
+                        })();
+                        """.trimIndent(),
+                        null
+                    )
+
+                    postDelayed({
+                        isRefreshing = false
+                    }, 1000)
+                }
+
+                addView(targetWebView)
+            }
+
+            swipeRefreshLayout
         },
         modifier = modifier.fillMaxSize()
     )

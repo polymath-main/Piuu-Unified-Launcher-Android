@@ -26,7 +26,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import com.piuu.launcher.model.*
+import com.piuu.launcher.repository.LauncherPreferenceManager
 import com.piuu.launcher.ui.theme.*
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -38,13 +42,37 @@ fun HomeScreen(
     notes: List<NoteItem>,
     onLaunchApp: (SystemApp) -> Unit,
     onOpenDrawer: () -> Unit,
+    onOpenSearch: () -> Unit = {},
     onOpenBrainChat: () -> Unit,
+    onOpenQuickSettings: () -> Unit = {},
+    onOpenWebView: () -> Unit = {},
+    onOpenMarketplace: () -> Unit = {},
+    onOpenMetrics: () -> Unit = {},
+    onOpenSchemaEditor: () -> Unit = {},
     onOpenFolder: () -> Unit,
     onAddNote: (String) -> Unit
 ) {
     val context = LocalContext.current
     val pages = schema.pages
     val pagerState = rememberPagerState(pageCount = { pages.size })
+    val prefManager = remember { LauncherPreferenceManager.getInstance(context) }
+
+    var totalDragX by remember { mutableFloatStateOf(0f) }
+    var totalDragY by remember { mutableFloatStateOf(0f) }
+
+    val executeAction: (String) -> Unit = { actionKey ->
+        when (actionKey) {
+            "DRAWER" -> onOpenDrawer()
+            "SEARCH" -> onOpenSearch()
+            "BRAIN_CHAT" -> onOpenBrainChat()
+            "QUICK_SETTINGS" -> onOpenQuickSettings()
+            "WEB_VIEW" -> onOpenWebView()
+            "MARKETPLACE" -> onOpenMarketplace()
+            "METRICS" -> onOpenMetrics()
+            "SCHEMA_EDITOR" -> onOpenSchemaEditor()
+            else -> {}
+        }
+    }
 
     val dockApps = remember(schema.dock.app_packages, installedApps) {
         schema.dock.app_packages.mapNotNull { pkg ->
@@ -56,6 +84,41 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Transparent)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = {
+                        executeAction(prefManager.gestureDoubleTap)
+                    }
+                )
+            }
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = {
+                        totalDragX = 0f
+                        totalDragY = 0f
+                    },
+                    onDrag = { _, dragAmount ->
+                        totalDragX += dragAmount.x
+                        totalDragY += dragAmount.y
+                    },
+                    onDragEnd = {
+                        val threshold = 80f
+                        if (kotlin.math.abs(totalDragY) > kotlin.math.abs(totalDragX)) {
+                            if (totalDragY < -threshold) {
+                                executeAction(prefManager.gestureSwipeUp)
+                            } else if (totalDragY > threshold) {
+                                executeAction(prefManager.gestureSwipeDown)
+                            }
+                        } else {
+                            if (totalDragX < -threshold) {
+                                executeAction(prefManager.gestureSwipeLeft)
+                            } else if (totalDragX > threshold) {
+                                executeAction(prefManager.gestureSwipeRight)
+                            }
+                        }
+                    }
+                )
+            }
     ) {
         // Horizontal Pager across launcher schema pages
         HorizontalPager(

@@ -1,8 +1,11 @@
 {
   "name": "piuu-launcher-android",
   "version": "1.0.0",
-  "private": true,
+  "description": "Highly customized able web based android launcher application.",
+  "main": "index.html",
   "scripts": {
-    "build": "echo 'Android Jetpack Compose App compiled successfully'"
-  }
+    "build": "mkdir -p dist && (cp index.html dist/ 2>/dev/null || true) && (cp -r css/ js/ assets/ metadata.json dist/ 2>/dev/null || true) && echo \"Frontend elements mirrored to distribution buffer.\""
+  },
+  "dependencies": {},
+  "devDependencies": {}
 }

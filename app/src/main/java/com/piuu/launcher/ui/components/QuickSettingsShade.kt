@@ -86,6 +86,13 @@ fun QuickSettingsShade(
         )
     }
 
+    val prefManager = remember { com.piuu.launcher.repository.LauncherPreferenceManager.getInstance(context) }
+    var gestureSwipeUp by remember { mutableStateOf(prefManager.gestureSwipeUp) }
+    var gestureSwipeDown by remember { mutableStateOf(prefManager.gestureSwipeDown) }
+    var gestureDoubleTap by remember { mutableStateOf(prefManager.gestureDoubleTap) }
+    var gestureSwipeLeft by remember { mutableStateOf(prefManager.gestureSwipeLeft) }
+    var gestureSwipeRight by remember { mutableStateOf(prefManager.gestureSwipeRight) }
+
     // Permission launchers
     val cameraPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
@@ -224,6 +231,99 @@ fun QuickSettingsShade(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Change System Wallpaper Intent", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Homescreen Gestures Configuration Card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, LauncherBorder, RoundedCornerShape(20.dp))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Homescreen Gesture Settings", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text("Map touch gestures to native launcher actions", fontSize = 11.sp, color = TextSecondary)
+                            }
+                            Icon(imageVector = Icons.Default.TouchApp, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        GestureRowSetting(
+                            title = "Swipe Up",
+                            gestureIcon = Icons.Default.SwipeUp,
+                            currentAction = gestureSwipeUp,
+                            onActionSelected = { action ->
+                                gestureSwipeUp = action
+                                prefManager.gestureSwipeUp = action
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        GestureRowSetting(
+                            title = "Swipe Down",
+                            gestureIcon = Icons.Default.SwipeDown,
+                            currentAction = gestureSwipeDown,
+                            onActionSelected = { action ->
+                                gestureSwipeDown = action
+                                prefManager.gestureSwipeDown = action
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        GestureRowSetting(
+                            title = "Double Tap",
+                            gestureIcon = Icons.Default.TouchApp,
+                            currentAction = gestureDoubleTap,
+                            onActionSelected = { action ->
+                                gestureDoubleTap = action
+                                prefManager.gestureDoubleTap = action
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        GestureRowSetting(
+                            title = "Swipe Left",
+                            gestureIcon = Icons.Default.West,
+                            currentAction = gestureSwipeLeft,
+                            onActionSelected = { action ->
+                                gestureSwipeLeft = action
+                                prefManager.gestureSwipeLeft = action
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        GestureRowSetting(
+                            title = "Swipe Right",
+                            gestureIcon = Icons.Default.East,
+                            currentAction = gestureSwipeRight,
+                            onActionSelected = { action ->
+                                gestureSwipeRight = action
+                                prefManager.gestureSwipeRight = action
+                            }
+                        )
                     }
                 }
 
@@ -475,6 +575,95 @@ fun PermissionRowItem(
                 modifier = Modifier.height(28.dp)
             ) {
                 Text("Grant", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+fun GestureRowSetting(
+    title: String,
+    gestureIcon: ImageVector,
+    currentAction: String,
+    onActionSelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val currentLabel = com.piuu.launcher.repository.LauncherPreferenceManager.GESTURE_ACTIONS.find { it.first == currentAction }?.second ?: currentAction
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.weight(1f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(PrimaryBlue.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = gestureIcon,
+                    contentDescription = title,
+                    tint = PrimaryBlue,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Column {
+                Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                Text(
+                    text = currentLabel,
+                    fontSize = 11.sp,
+                    color = TextSecondary
+                )
+            }
+        }
+
+        Box {
+            OutlinedButton(
+                onClick = { expanded = true },
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryBlue)
+            ) {
+                Text(
+                    text = currentLabel,
+                    fontSize = 11.sp,
+                    color = PrimaryBlue,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(16.dp))
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(Color(0xFF1E293B))
+            ) {
+                com.piuu.launcher.repository.LauncherPreferenceManager.GESTURE_ACTIONS.forEach { (actionKey, actionLabel) ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                actionLabel,
+                                fontSize = 12.sp,
+                                color = if (actionKey == currentAction) PrimaryBlue else TextPrimary,
+                                fontWeight = if (actionKey == currentAction) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        onClick = {
+                            onActionSelected(actionKey)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }

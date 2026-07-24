@@ -43,37 +43,49 @@ class LauncherRepository(private val context: Context) {
         SystemApp("com.whatsapp", "WhatsApp", "message", "social", "intent://whatsapp", 340, 14, false, "#25D366", "Instant messaging")
     )
 
-    // ── Default Marketplace Catalog loaded from SchemeStore ─────────────────────
-    val marketplaceCatalog: List<MarketplaceItem>
-        get() {
-            val store = SchemeManager.getInstance(context)
-            val categories = listOf("themes", "fonts", "layouts", "faces", "widgets", "icons", "agents", "skills")
-            val items = mutableListOf<MarketplaceItem>()
-            for (category in categories) {
-                val schemes = store.getSchemesForCategory(category)
-                for (scheme in schemes) {
-                    val cat = when (category) {
-                        "themes" -> "theming"
-                        else -> category
-                    }
-                    items.add(
-                        MarketplaceItem(
-                            id = scheme.id,
-                            name = scheme.name,
-                            category = cat,
-                            author = scheme.author,
-                            rating = 4.8f,
-                            downloads = 1200,
-                            description = scheme.description,
-                            preview_badge = if (scheme.isCustom) "Custom" else "Official",
-                            payload = scheme.payload,
-                            is_installed = true
-                        )
-                    )
+    // ── Marketplace Catalog loaded from SchemeStore ────────────────────────────
+    fun getMarketplaceCatalog(currentSchema: LauncherSchema? = null): List<MarketplaceItem> {
+        val schema = currentSchema ?: getSchema()
+        val store = SchemeManager.getInstance(context)
+        val categories = listOf("themes", "fonts", "layouts", "faces", "widgets", "icons", "agents", "skills")
+        val items = mutableListOf<MarketplaceItem>()
+        for (category in categories) {
+            val schemes = store.getSchemesForCategory(category)
+            for (scheme in schemes) {
+                val cat = when (category) {
+                    "themes" -> "theming"
+                    else -> category
                 }
+
+                val isApplied = when (cat) {
+                    "theming" -> schema.theme.id == scheme.id
+                    "fonts" -> schema.active_font == scheme.id || schema.theme.font_family.contains(scheme.id.removePrefix("font_"), ignoreCase = true)
+                    "layouts" -> schema.drawer_layout == scheme.id || schema.drawer_layout.contains(scheme.id.removePrefix("layout_"), ignoreCase = true)
+                    "icons" -> schema.active_icon_pack == scheme.id || schema.active_icon_pack.contains(scheme.id.removePrefix("iconpack_"), ignoreCase = true)
+                    else -> schema.installed_plugins.contains(scheme.id)
+                }
+
+                items.add(
+                    MarketplaceItem(
+                        id = scheme.id,
+                        name = scheme.name,
+                        category = cat,
+                        author = scheme.author,
+                        rating = 4.8f,
+                        downloads = 1250,
+                        description = scheme.description,
+                        preview_badge = if (scheme.isCustom) "Custom" else "Official",
+                        payload = scheme.payload,
+                        is_installed = isApplied
+                    )
+                )
             }
-            return items
         }
+        return items
+    }
+
+    val marketplaceCatalog: List<MarketplaceItem>
+        get() = getMarketplaceCatalog()
 
     // ── Initial Notifications ───────────────────────────────────────────────────
     val defaultNotifications = mutableListOf(

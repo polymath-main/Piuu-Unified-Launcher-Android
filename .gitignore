@@ -1,6 +1,11 @@
 node_modules/
 build/
 dist/
+.gradle/
+.idea/
+*.apk
+*.aar
+local.properties
 coverage/
 .DS_Store
 *.log

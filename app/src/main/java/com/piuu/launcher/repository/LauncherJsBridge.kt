@@ -40,6 +40,16 @@ class LauncherJsBridge(
     }
 
     @JavascriptInterface
+    fun fetchFreshNativeApps(): String {
+        return try {
+            repository.scanAndSaveInstalledApps(context)
+            getInstalledAppsJson()
+        } catch (e: Exception) {
+            "[]"
+        }
+    }
+
+    @JavascriptInterface
     fun getInstalledAppsJson(): String {
         return try {
             val apps = repository.getApps()
