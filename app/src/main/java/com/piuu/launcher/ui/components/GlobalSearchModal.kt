@@ -44,18 +44,21 @@ fun GlobalSearchModal(
         SearchResultItem("s4", "Edit Launcher Schema JSON", "Piuu IDE", "setting", "open_schema", "code")
     ).filter { query.isEmpty() || it.title.contains(query, ignoreCase = true) }
 
-    ModalBottomSheet(
+    androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
-        containerColor = LauncherBackground,
-        scrimColor = Color.Black.copy(alpha = 0.6f),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.85f)
-                .padding(horizontal = 20.dp, vertical = 8.dp)
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = LauncherBackground
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+            ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -156,4 +159,5 @@ fun GlobalSearchModal(
             }
         }
     }
+}
 }

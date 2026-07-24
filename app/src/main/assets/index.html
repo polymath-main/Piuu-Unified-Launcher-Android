@@ -48,7 +48,7 @@
             padding: 0;
             user-select: none;
             -webkit-user-select: none;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif);
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
         }
@@ -255,6 +255,7 @@
             padding: 8px 4px;
             border-radius: 14px;
             transition: background-color 0.2s ease, transform 0.1s ease;
+            will-change: transform;
         }
 
         .app-item:active {
@@ -612,11 +613,19 @@
                 <div class="category-title" style="color: var(--primary-blue); display: flex; align-items: center; gap: 6px;">
                     🛍️ Piuu Marketplace <span class="category-count" id="count-marketplace" style="background: rgba(59, 130, 246, 0.15); color: var(--primary-blue);">0</span>
                 </div>
-                <div class="category-chevron" id="marketplace-tab-selector" style="display: flex; gap: 12px; transform: none; font-size: 11px; font-weight: bold;">
+                <div class="category-chevron" id="marketplace-tab-selector" style="display: flex; gap: 10px; transform: none; font-size: 11px; font-weight: bold; flex-wrap: wrap; justify-content: flex-end;">
                     <span id="tab-marketplace-themes" onclick="changeMarketplaceTab('themes', event)" style="cursor: pointer; color: var(--primary-blue); border-bottom: 2px solid var(--primary-blue); padding-bottom: 2px;">Themes</span>
+                    <span id="tab-marketplace-fonts" onclick="changeMarketplaceTab('fonts', event)" style="cursor: pointer; color: var(--text-secondary);">Fonts</span>
                     <span id="tab-marketplace-icons" onclick="changeMarketplaceTab('icons', event)" style="cursor: pointer; color: var(--text-secondary);">Icons</span>
                     <span id="tab-marketplace-layouts" onclick="changeMarketplaceTab('layouts', event)" style="cursor: pointer; color: var(--text-secondary);">Layouts</span>
+                    <span id="tab-marketplace-agents" onclick="changeMarketplaceTab('agents', event)" style="cursor: pointer; color: var(--text-secondary);">Agents</span>
                 </div>
+            </div>
+            
+            <!-- Marketplace Search Filtering Mechanism -->
+            <div style="position: relative; margin-top: 4px; margin-bottom: 12px;">
+                <input type="text" id="marketplace-search-input" class="search-box" style="padding: 10px 14px; font-size: 12px; border-radius: 12px;" placeholder="Search marketplace themes, fonts, icon packs, layouts, agents..." oninput="filterMarketplace()">
+                <span style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 13px; pointer-events: none;">🔍</span>
             </div>
             
             <div id="marketplace-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px; margin-bottom: 24px;">
@@ -1176,8 +1185,14 @@
             if (event) event.stopPropagation();
             activeMarketplaceCategory = category;
             
+            // Clear search input on tab change
+            const searchInput = document.getElementById('marketplace-search-input');
+            if (searchInput) {
+                searchInput.value = '';
+            }
+            
             // Update Tab styles
-            ['themes', 'icons', 'layouts'].forEach(cat => {
+            ['themes', 'fonts', 'icons', 'layouts', 'agents'].forEach(cat => {
                 const tab = document.getElementById(`tab-marketplace-${cat}`);
                 if (tab) {
                     if (cat === category) {
@@ -1192,6 +1207,10 @@
                 }
             });
             
+            loadMarketplaceData();
+        }
+
+        function filterMarketplace() {
             loadMarketplaceData();
         }
 
@@ -1213,6 +1232,13 @@
                         {id: "theme_neon", category: "themes", name: "Cyber Neon", author: "Piuu System", description: "Vibrant glowing synthwave theme with cyan and pink neon lights.", payload: JSON.stringify({id: "theme_neon", name: "Cyber Neon", bg_color: "#090514", card_bg: "rgba(236, 72, 153, 0.12)", card_border: "rgba(6, 182, 212, 0.4)", text_primary: "#06b6d4", text_secondary: "#ec4899", primary_blue: "#06b6d4", accent_purple: "#ec4899", glass_blur: "blur(14px)", icon_size: "52px", drawer_columns: "4", card_opacity: "0.75"})},
                         {id: "theme_minimal", category: "themes", name: "Minimal Slate", author: "Piuu System", description: "Ultra-clean gray canvas for zero distraction productivity.", payload: JSON.stringify({id: "theme_minimal", name: "Minimal Slate", bg_color: "#121212", card_bg: "rgba(30, 41, 59, 0.2)", card_border: "rgba(148, 163, 184, 0.15)", text_primary: "#e2e8f0", text_secondary: "#64748b", primary_blue: "#94a3b8", accent_purple: "#475569", glass_blur: "blur(4px)", icon_size: "52px", drawer_columns: "4", card_opacity: "0.95"})}
                     ];
+                } else if (activeMarketplaceCategory === 'fonts') {
+                    schemes = [
+                        {id: "font_inter", category: "fonts", name: "Inter Modern", author: "Rasmus Andersson", description: "A highly legible, clean geometric sans-serif typeface optimized for UI displays.", payload: JSON.stringify({id: "font_inter", name: "Inter Modern", font_family: "Inter, system-ui, sans-serif"})},
+                        {id: "font_plus_jakarta", category: "fonts", name: "Plus Jakarta Sans", author: "Tokotype", description: "A warm, premium geometric font featuring wide breathing loops and friendly shapes.", payload: JSON.stringify({id: "font_plus_jakarta", name: "Plus Jakarta Sans", font_family: "'Plus Jakarta Sans', sans-serif"})},
+                        {id: "font_playfair", category: "fonts", name: "Playfair Display", author: "Claus Eggers Sørensen", description: "An elegant, high-contrast transitional serif typeface ideal for visual display headers.", payload: JSON.stringify({id: "font_playfair", name: "Playfair Display", font_family: "'Playfair Display', serif"})},
+                        {id: "font_fira_code", category: "fonts", name: "Fira Code Mono", author: "Nikita Prokopov", description: "A clean monospaced font with programmed programming ligatures for clean developer grids.", payload: JSON.stringify({id: "font_fira_code", name: "Fira Code Mono", font_family: "'Fira Code', monospace"})}
+                    ];
                 } else if (activeMarketplaceCategory === 'icons') {
                     schemes = [
                         {id: "iconpack_neon", category: "icons", name: "Cyber Glyphs Iconpack", author: "NeoTokyo Labs", description: "High glow icons that light up along primary aesthetic lines", payload: "{}"},
@@ -1220,12 +1246,30 @@
                         {id: "iconpack_monochrome", category: "icons", name: "Slate Outline Pack", author: "Monochrome", description: "Single-tone thin white wire outlines offering clean modern minimal looks", payload: "{}"},
                         {id: "iconpack_pixel", category: "icons", name: "Pixel Art 8-Bit", author: "RetroVibe", description: "Handmade nostalgia-filled pixelated shapes of popular apps", payload: "{}"}
                     ];
-                } else {
+                } else if (activeMarketplaceCategory === 'layouts') {
                     schemes = [
                         {id: "layout_categorized", category: "layouts", name: "Smart Categorized", author: "Piuu Core", description: "Auto-groups application icons into smart folders using lightweight NLP rules", payload: "{}"},
                         {id: "layout_vertical", category: "layouts", name: "Classic Vertical Grid", author: "AOSP Dev", description: "Traditional vertical scrolling app grid with responsive fling speed", payload: "{}"}
                     ];
+                } else if (activeMarketplaceCategory === 'agents') {
+                    schemes = [
+                        {id: "agent_copilot", category: "agents", name: "Piuu Co-Pilot", author: "Piuu AI Lab", description: "Your main productivity co-pilot, specialized in launching apps, searching information, and scheduling routines.", payload: JSON.stringify({id: "agent_copilot", name: "Piuu Co-Pilot"})},
+                        {id: "agent_analyst", category: "agents", name: "Metrics Analyst", author: "Piuu Engineering", description: "An analytical AI designed to process local system metrics, app usage telemetry, and screen time to optimize layouts.", payload: JSON.stringify({id: "agent_analyst", name: "Metrics Analyst"})},
+                        {id: "agent_creative", category: "agents", name: "Aesthetic Designer", author: "NeoTokyo Design", description: "A creative companion specialized in suggesting color harmonies, customizing icons, and generating eye-catching wallpaper templates.", payload: JSON.stringify({id: "agent_creative", name: "Aesthetic Designer"})},
+                        {id: "agent_zen", category: "agents", name: "Zen Mindfulness", author: "Yosemite Labs", description: "A calm, meditative presence that helps you focus, practice structured breathing loops, and reduce screen time.", payload: JSON.stringify({id: "agent_zen", name: "Zen Mindfulness"})}
+                    ];
                 }
+            }
+
+            // Apply search filtering
+            const searchInput = document.getElementById('marketplace-search-input');
+            const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+            if (query) {
+                schemes = schemes.filter(scheme => 
+                    (scheme.name && scheme.name.toLowerCase().includes(query)) ||
+                    (scheme.author && scheme.author.toLowerCase().includes(query)) ||
+                    (scheme.description && scheme.description.toLowerCase().includes(query))
+                );
             }
 
             const grid = document.getElementById('marketplace-grid');
@@ -1318,6 +1362,32 @@
                     } catch(e) {}
                 }
                 showToast(`Applied layout: ${id}`);
+            } else if (category === 'fonts') {
+                const fontObj = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                if (fontObj.font_family) {
+                    document.documentElement.style.setProperty('--font-family', fontObj.font_family);
+                    document.body.style.fontFamily = fontObj.font_family;
+                }
+                if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.applySchemaValues === 'function') {
+                    try {
+                        const schemeValues = {
+                            active_font: fontObj.font_family || fontObj.id
+                        };
+                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify(schemeValues));
+                    } catch(e) {}
+                }
+                showToast(`Applied font: ${fontObj.name}`);
+            } else if (category === 'agents') {
+                const agentObj = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.applySchemaValues === 'function') {
+                    try {
+                        const schemeValues = {
+                            active_agent: agentObj.name || agentObj.id
+                        };
+                        window.AndroidLauncherBridge.applySchemaValues(JSON.stringify(schemeValues));
+                    } catch(e) {}
+                }
+                showToast(`Active AI Agent set to: ${agentObj.name}`);
             }
         }
 
@@ -1378,6 +1448,32 @@
                 console.error("Error applying config change", e);
             }
         };
+
+        // requestAnimationFrame-based scroll throttling for fluid, thrash-free interaction
+        let lastKnownScrollPosition = 0;
+        let ticking = false;
+
+        function onScrollThrottled(scrollPos) {
+            // Adjust body or header classes if necessary to trigger GPU-accelerated styling changes
+            if (scrollPos > 15) {
+                document.body.classList.add('body-scrolled');
+            } else {
+                document.body.classList.remove('body-scrolled');
+            }
+        }
+
+        window.addEventListener('scroll', function() {
+            lastKnownScrollPosition = window.scrollY;
+
+            if (!ticking) {
+                window.requestAnimationFrame(function() {
+                    onScrollThrottled(lastKnownScrollPosition);
+                    ticking = false;
+                });
+
+                ticking = true;
+            }
+        }, { passive: true });
 
         // Initialize App Hub
         function init() {

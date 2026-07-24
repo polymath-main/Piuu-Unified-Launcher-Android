@@ -1,0 +1,8 @@
+{
+  "id": "font_playfair",
+  "name": "Playfair Display",
+  "author": "Claus Eggers Sørensen",
+  "description": "An elegant, high-contrast transitional serif typeface ideal for visual display headers.",
+  "font_family": "Playfair Display, serif",
+  "letter_spacing": "0.02em"
+}

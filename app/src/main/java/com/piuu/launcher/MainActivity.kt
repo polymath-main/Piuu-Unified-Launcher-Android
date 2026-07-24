@@ -9,6 +9,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -376,45 +378,58 @@ fun LauncherAppMain(
 
         // Hybrid WebView Drawer Sheet
         if (showWebView) {
-            ModalBottomSheet(
+            androidx.compose.ui.window.Dialog(
                 onDismissRequest = { showWebView = false },
-                containerColor = Color(0xFF020817),
-                scrimColor = Color.Black.copy(alpha = 0.6f),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight(0.88f)
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = Color(0xFF020817)
                 ) {
-                    HybridWebViewComposable(
-                        repository = repository,
-                        latencyManager = latencyManager,
-                        aiEngine = aiEngine,
-                        onLaunchApp = { packageName, appName ->
-                            val app = apps.firstOrNull { it.package_name == packageName }
-                            if (app != null) {
-                                handleLaunchApp(app)
-                            } else {
-                                when (packageName) {
-                                    "com.piuu.brain" -> {
-                                        showBrainChat = true
-                                    }
-                                    "com.piuu.ide" -> {
-                                        showSchemaEditor = true
-                                    }
-                                    "com.piuu.suite" -> {
-                                        showMarketplace = true
-                                    }
-                                    else -> {
-                                        latencyManager.launchAppFast(context, packageName)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            IconButton(onClick = { showWebView = false }) {
+                                Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HybridWebViewComposable(
+                            repository = repository,
+                            latencyManager = latencyManager,
+                            aiEngine = aiEngine,
+                            onLaunchApp = { packageName, appName ->
+                                val app = apps.firstOrNull { it.package_name == packageName }
+                                if (app != null) {
+                                    handleLaunchApp(app)
+                                } else {
+                                    when (packageName) {
+                                        "com.piuu.brain" -> {
+                                            showBrainChat = true
+                                        }
+                                        "com.piuu.ide" -> {
+                                            showSchemaEditor = true
+                                        }
+                                        "com.piuu.suite" -> {
+                                            showMarketplace = true
+                                        }
+                                        else -> {
+                                            latencyManager.launchAppFast(context, packageName)
+                                        }
                                     }
                                 }
+                                showWebView = false
                             }
-                            showWebView = false
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }

@@ -1,0 +1,8 @@
+{
+  "id": "font_inter",
+  "name": "Inter Modern",
+  "author": "Rasmus Andersson",
+  "description": "A highly legible, clean geometric sans-serif typeface optimized for UI displays.",
+  "font_family": "Inter, system-ui, sans-serif",
+  "letter_spacing": "-0.02em"
+}

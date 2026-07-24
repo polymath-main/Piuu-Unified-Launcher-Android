@@ -1,0 +1,9 @@
+{
+  "id": "agent_copilot",
+  "name": "Piuu Co-Pilot",
+  "author": "Piuu AI Lab",
+  "description": "Your main productivity co-pilot, specialized in launching apps, searching information, and scheduling routines.",
+  "model": "gemini-1.5-flash",
+  "temperature": 0.7,
+  "greeting": "Hello! I am your Piuu Co-Pilot. How can I speed up your launcher experience today?"
+}

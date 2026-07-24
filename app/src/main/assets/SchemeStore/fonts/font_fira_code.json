@@ -1,0 +1,8 @@
+{
+  "id": "font_fira_code",
+  "name": "Fira Code Mono",
+  "author": "Nikita Prokopov",
+  "description": "A clean monospaced font with programmed programming ligatures for clean developer grids.",
+  "font_family": "Fira Code, monospace",
+  "letter_spacing": "0.0em"
+}

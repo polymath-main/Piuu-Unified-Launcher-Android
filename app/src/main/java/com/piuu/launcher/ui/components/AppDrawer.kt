@@ -51,42 +51,54 @@ fun AppDrawer(
 
     val frequentApps = apps.sortedByDescending { it.usage_count }.take(5)
 
-    ModalBottomSheet(
+    androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
-        containerColor = LauncherBackground,
-        scrimColor = Color.Black.copy(alpha = 0.6f),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.85f)
-                .padding(horizontal = 20.dp, vertical = 8.dp)
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = LauncherBackground
         ) {
-            // Header Search Input
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Search ${apps.size} installed apps...", color = TextMuted) },
-                leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = PrimaryBlue) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = TextMuted)
-                        }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+            ) {
+                // Header Search Input & Close Button Row
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search ${apps.size} installed apps...", color = TextMuted) },
+                        leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = PrimaryBlue) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = TextMuted)
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryBlue,
+                            unfocusedBorderColor = LauncherBorder,
+                            focusedContainerColor = CardGlassBg,
+                            unfocusedContainerColor = CardGlassBg,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(onClick = onDismiss) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
                     }
-                },
-                shape = RoundedCornerShape(20.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = PrimaryBlue,
-                    unfocusedBorderColor = LauncherBorder,
-                    focusedContainerColor = CardGlassBg,
-                    unfocusedContainerColor = CardGlassBg,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
+                }
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -164,6 +176,7 @@ fun AppDrawer(
             }
         }
     }
+}
 }
 
 @Composable
