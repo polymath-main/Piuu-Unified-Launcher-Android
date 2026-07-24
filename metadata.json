@@ -1,0 +1,6 @@
+{
+  "name": "Piuu Launcher",
+  "description": "Modular, schema-driven, GenAI-powered Android launcher with native web bridge, plugin marketplace, and predictive intelligence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

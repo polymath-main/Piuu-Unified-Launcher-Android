@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Piuu Launcher Web Interface</title>
+    <style>
+        :root {
+            --bg-color: #020817;
+            --card-bg: rgba(30, 41, 59, 0.45);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --primary-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --star-gold: #f59e0b;
+            --glass-blur: blur(12px);
+            --icon-size: 52px;
+            --drawer-columns: 4;
+            --card-opacity: 0.85;
+        }
+
+        /* Flexbox and CSS Grid widget layout scopes with proper padding & margins */
+        .widget-grid-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+            padding: 0 4px;
+        }
+
+        .widget-flex-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            margin-bottom: 12px;
+            backdrop-filter: var(--glass-blur);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            padding: 16px;
+            overflow-x: hidden;
+            padding-bottom: 40px;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .title-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .title {
+            font-size: 19px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .badge {
+            font-size: 10px;
+            background: rgba(56, 189, 248, 0.15);
+            color: #38bdf8;
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            font-weight: 600;
+            backdrop-filter: var(--glass-blur);
+        }
+
+        .search-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search-box {
+            width: 100%;
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            padding: 14px 16px;
+            padding-right: 42px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            backdrop-filter: var(--glass-blur);
+            transition: all 0.2s ease;
+        }
+
+        .search-box:focus {
+            border-color: rgba(56, 189, 248, 0.5);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            pointer-events: none;
+            font-size: 16px;
+        }
+
+        .stats-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 14px 18px;
+            border: 1px solid var(--card-border);
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: var(--glass-blur);
+        }
+
+        .stats-left {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stats-val {
+            font-size: 24px;
+            font-weight: 800;
+            color: #38bdf8;
+            line-height: 1;
+        }
+
+        .stats-desc {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .stats-badge {
+            background: rgba(139, 92, 246, 0.15);
+            color: #a78bfa;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            font-size: 10px;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 12px;
+        }
+
+        /* Category Header Styles */
+        .category-section {
+            margin-bottom: 16px;
+        }
+
+        .category-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 4px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            margin-bottom: 12px;
+            transition: opacity 0.2s ease;
+        }
+
+        .category-header:active {
+            opacity: 0.7;
+        }
+
+        .category-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .category-count {
+            font-size: 11px;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 2px 6px;
+            border-radius: 10px;
+            color: var(--text-secondary);
+        }
+
+        .category-chevron {
+            font-size: 12px;
+            color: var(--text-secondary);
+            transition: transform 0.2s ease;
+        }
+
+        .category-section.collapsed .category-chevron {
+            transform: rotate(-90deg);
+        }
+
+        .category-section.collapsed .app-grid {
+            display: none;
+        }
+
+        /* App Grid Layout */
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .app-item {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            padding: 8px 4px;
+            border-radius: 14px;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+
+        .app-item:active {
+            transform: scale(0.92);
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        .icon-wrapper {
+            position: relative;
+            width: 52px;
+            height: 52px;
+            margin-bottom: 8px;
+        }
+
+        .icon-box {
+            width: 100%;
+            height: 100%;
+            border-radius: 16px;
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid var(--card-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .app-item:hover .icon-box {
+            border-color: rgba(56, 189, 248, 0.4);
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
+        }
+
+        .app-label {
+            font-size: 11px;
+            color: #cbd5e1;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+            font-weight: 500;
+        }
+
+        /* Star Button */
+        .star-btn {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 10px;
+            z-index: 5;
+            transition: all 0.2s ease;
+        }
+
+        .star-btn.starred {
+            color: var(--star-gold);
+            border-color: rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, 0.15);
+        }
+
+        /* Skeleton Loading pulse animation */
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .skeleton-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+        }
+
+        .skeleton-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: pulse 1.5s infinite ease-in-out;
+            padding: 8px 4px;
+        }
+
+        .skeleton-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid var(--card-border);
+            margin-bottom: 8px;
+        }
+
+        .skeleton-text {
+            width: 44px;
+            height: 10px;
+            border-radius: 5px;
+            background: rgba(30, 41, 59, 0.5);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .sortable-ghost {
+            opacity: 0.4 !important;
+            background: rgba(139, 92, 246, 0.25) !important;
+            border: 1px dashed #a78bfa !important;
+        }
+
+        /* High-performance Flutter-smooth spring curves and transitions */
+        .app-item, .category-header, .notification-item, .search-box, .stats-card {
+            transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            will-change: transform, opacity;
+        }
+
+        /* Real-time Notification Center Styles */
+        .notification-item {
+            background: rgba(30, 41, 59, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 14px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            position: relative;
+            animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+        }
+
+        .notification-item:active {
+            transform: scale(0.98);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .notif-icon-box {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            background: rgba(139, 92, 246, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+            color: #a78bfa;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+
+        .notif-details {
+            flex-grow: 1;
+            min-width: 0;
+        }
+
+        .notif-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2px;
+        }
+
+        .notif-app-name {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #a78bfa;
+        }
+
+        .notif-time {
+            font-size: 9px;
+            color: var(--text-secondary);
+        }
+
+        .notif-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .notif-content {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 1px;
+            line-height: 1.3;
+        }
+
+        .notif-dismiss {
+            color: var(--text-secondary);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0px 4px;
+            line-height: 1;
+            transition: color 0.15s;
+            margin-left: 4px;
+        }
+
+        .notif-dismiss:hover {
+            color: #ef4444;
+        }
+    </style>
+    <!-- SortableJS library for in-browser drag-and-drop reordering of app grid -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <div class="title-container">
+            <div class="title" id="launcher-title">Piuu App Hub</div>
+            <div class="subtitle">Hybrid Low-Latency Launcher</div>
+        </div>
+        <div class="badge" id="latency-badge">Syncing...</div>
+    </div>
+
+    <div class="search-container">
+        <input type="text" class="search-box" id="search-input" placeholder="Search apps, utilities, AI..." oninput="filterApps()">
+        <span class="search-icon">🔍</span>
+    </div>
+
+    <div class="stats-card">
+        <div class="stats-left">
+            <div class="stats-val" id="app-count">0</div>
+            <div class="stats-desc">Natively Synced Applications</div>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+            <div class="stats-badge" id="stats-speed">Ready</div>
+            <div class="stats-badge" id="supabase-sync-status" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3);">Sync Ready</div>
+        </div>
+    </div>
+
+    <!-- Live Notification Center Widget -->
+    <div class="category-section hidden" id="section-notifications">
+        <div class="category-header" style="cursor: default;">
+            <div class="category-title" style="color: #a78bfa; display: flex; align-items: center; gap: 6px;">
+                🔔 Live Feed <span class="category-count" id="count-notifications" style="background: rgba(139, 92, 246, 0.15); color: #a78bfa;">0</span>
+            </div>
+            <div class="category-chevron" onclick="clearAllNotificationsWeb(event)" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); cursor: pointer; transform: none; font-weight: bold;">Clear All</div>
+        </div>
+        <div id="notifications-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;"></div>
+    </div>
+
+    <!-- SKELETON LOADER -->
+    <div id="skeleton-loader" class="category-section">
+        <div class="category-title" style="margin-bottom: 12px; text-transform: uppercase; font-size:11px; letter-spacing:0.05em; color: var(--text-secondary);">Analyzing package manager...</div>
+        <div class="skeleton-container">
+            <div class="skeleton-item"><div class="skeleton-icon"></div><div class="skeleton-text"></div></div>
+            <div class="skeleton-item"><div class="skeleton-icon"></div><div class="skeleton-text"></div></div>
+            <div class="skeleton-item"><div class="skeleton-icon"></div><div class="skeleton-text"></div></div>
+            <div class="skeleton-item"><div class="skeleton-icon"></div><div class="skeleton-text"></div></div>
+            <div class="skeleton-item"><div class="skeleton-icon"></div><div class="skeleton-text"></div></div>
+            <div class="skeleton-item"><div class="skeleton-icon"></div><div class="skeleton-text"></div></div>
+            <div class="skeleton-item"><div class="skeleton-icon"></div><div class="skeleton-text"></div></div>
+            <div class="skeleton-item"><div class="skeleton-icon"></div><div class="skeleton-text"></div></div>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTENT -->
+    <div id="app-content" class="hidden">
+        <!-- Favorites Section -->
+        <div class="category-section" id="section-favorites">
+            <div class="category-header">
+                <div class="category-title" style="color: var(--star-gold);">
+                    ⭐ Favorites <span class="category-count" id="count-favorites" style="background: rgba(245, 158, 11, 0.15); color: var(--star-gold);">0</span>
+                </div>
+            </div>
+            <div class="app-grid" id="grid-favorites"></div>
+        </div>
+
+        <!-- Categorized Sections Container -->
+        <div id="categorized-container"></div>
+    </div>
+
+    <script>
+        let allApps = [];
+        // Map to cache base64 icons globally in memory
+        const iconCache = {};
+
+        // Load collapsed states from localStorage so user preferences persist
+        const collapsedStates = JSON.parse(localStorage.getItem('piuu_collapsed_categories') || '{}');
+
+        // Human-friendly category titles
+        const categoryLabels = {
+            'favorites': '⭐ Favorites',
+            'social': '💬 Social & Chat',
+            'productivity': '📅 Productivity & Work',
+            'entertainment': '🎵 Media & Entertainment',
+            'system': '⚙️ System Utilities',
+            'utilities': '🛠️ General Tools',
+            'finance': '💳 Finance & Banks',
+            'creative': '🎨 Creative & Photo',
+            'piuu_suite': '⚡ Piuu Suite'
+        };
+
+        function getCategoryLabel(cat) {
+            return categoryLabels[cat] || (cat.charAt(0).toUpperCase() + cat.slice(1));
+        }
+
+        // Load cached app list instantly on startup
+        function loadInstantWebCache() {
+            try {
+                const cached = localStorage.getItem('piuu_cached_apps');
+                if (cached) {
+                    allApps = JSON.parse(cached);
+                    if (allApps && allApps.length > 0) {
+                        renderAll(allApps);
+                        // Hide skeleton early if we have cache
+                        document.getElementById('skeleton-loader').classList.add('hidden');
+                        document.getElementById('app-content').classList.remove('hidden');
+                    }
+                }
+            } catch(e) {
+                console.error("Error reading startup cache", e);
+            }
+        }
+
+        // Fetch fresh list from native Android bridge with Batch and Offload strategy
+        function fetchFreshNativeApps() {
+            if (window.AndroidLauncherBridge) {
+                try {
+                    let json = "";
+                    if (typeof window.AndroidLauncherBridge.getProcessedAppsBatchJson === 'function') {
+                        // High-speed GPU pre-decoding and WebP compressed batch
+                        json = window.AndroidLauncherBridge.getProcessedAppsBatchJson();
+                    } else if (typeof window.AndroidLauncherBridge.getInstalledAppsJson === 'function') {
+                        json = window.AndroidLauncherBridge.getInstalledAppsJson();
+                    }
+
+                    if (json && json.trim() !== "") {
+                        const freshApps = JSON.parse(json);
+                        if (freshApps && freshApps.length > 0) {
+                            allApps = freshApps;
+                            // Save to local cache (Smart caching layer)
+                            localStorage.setItem('piuu_cached_apps', JSON.stringify(freshApps));
+                            
+                            renderAll(freshApps);
+                            
+                            // Hide skeleton
+                            document.getElementById('skeleton-loader').classList.add('hidden');
+                            document.getElementById('app-content').classList.remove('hidden');
+
+                            // Update performance stats
+                            const latency = window.AndroidLauncherBridge.getAverageLatencyMs();
+                            document.getElementById('latency-badge').innerText = latency + 'ms Launch';
+                            document.getElementById('stats-speed').innerText = 'Low-Latency Bridge';
+                        }
+                    }
+                } catch(e) {
+                    console.error("Error fetching fresh app list", e);
+                }
+            } else {
+                // Simulated backup environment for preview testing
+                setTimeout(() => {
+                    const mockApps = [
+                        {package_name: "com.android.phone", name: "Phone", category: "system", is_favorite: true, theme_color: "#10B981"},
+                        {package_name: "com.android.mms", name: "Messages", category: "social", is_favorite: true, theme_color: "#3B82F6"},
+                        {package_name: "com.android.chrome", name: "Chrome", category: "utilities", is_favorite: true, theme_color: "#EF4444"},
+                        {package_name: "com.piuu.brain", name: "Piuu Brain", category: "piuu_suite", is_favorite: true, theme_color: "#6366F1"},
+                        {package_name: "com.spotify.music", name: "Spotify", category: "entertainment", is_favorite: false, theme_color: "#22C55E"},
+                        {package_name: "com.android.settings", name: "Settings", category: "system", is_favorite: false, theme_color: "#64748B"}
+                    ];
+                    allApps = mockApps;
+                    renderAll(mockApps);
+                    document.getElementById('skeleton-loader').classList.add('hidden');
+                    document.getElementById('app-content').classList.remove('hidden');
+                }, 400);
+            }
+        }
+
+        // Global System Intent Listener for PACKAGE_ADDED or PACKAGE_REMOVED (Debounced & Coalesced)
+        let packageChangedTimeout = null;
+        window.onPackageChanged = function() {
+            clearTimeout(packageChangedTimeout);
+            packageChangedTimeout = setTimeout(() => {
+                console.log("Package change detected: invalidating cache and executing batched bridge fetch...");
+                localStorage.removeItem('piuu_cached_apps');
+                fetchFreshNativeApps();
+            }, 300); // 300ms Debounce to consolidate rapid back-to-back package updates
+        };
+
+        function toggleCategory(category) {
+            collapsedStates[category] = !collapsedStates[category];
+            localStorage.setItem('piuu_collapsed_categories', JSON.stringify(collapsedStates));
+            
+            const element = document.getElementById(`sec-${category}`);
+            if (element) {
+                if (collapsedStates[category]) {
+                    element.classList.add('collapsed');
+                } else {
+                    element.classList.remove('collapsed');
+                }
+            }
+        }
+
+        function toggleFavorite(packageName, event) {
+            if (event) event.stopPropagation(); // Avoid triggering app launch click
+            
+            if (window.AndroidLauncherBridge) {
+                const isFavorite = window.AndroidLauncherBridge.toggleAppFavorite(packageName);
+                // Dynamically update state inside our array
+                const appIndex = allApps.findIndex(a => a.package_name === packageName);
+                if (appIndex !== -1) {
+                    allApps[appIndex].is_favorite = isFavorite;
+                    localStorage.setItem('piuu_cached_apps', JSON.stringify(allApps));
+                    renderAll(allApps);
+                }
+            } else {
+                // Mock toggle in browser environment
+                const appIndex = allApps.findIndex(a => a.package_name === packageName);
+                if (appIndex !== -1) {
+                    allApps[appIndex].is_favorite = !allApps[appIndex].is_favorite;
+                    renderAll(allApps);
+                }
+            }
+        }
+
+        // Asynchronously fetch high quality native icons and inject them to avoid main thread layout lag!
+        function loadHighQualityIcon(packageName, imgId) {
+            // Check memory cache first
+            if (iconCache[packageName]) {
+                const img = document.getElementById(imgId);
+                if (img) img.src = iconCache[packageName];
+                return;
+            }
+
+            // Check if we already have the icon_base64 from the batched retrieval
+            const app = allApps.find(a => a.package_name === packageName);
+            if (app && app.icon_base64) {
+                const dataUrl = `data:image/webp;base64,${app.icon_base64}`;
+                iconCache[packageName] = dataUrl;
+                const img = document.getElementById(imgId);
+                if (img) img.src = dataUrl;
+                return;
+            }
+
+            // Check localStorage web cache next to speed up consecutive launches
+            const localCachedIcon = localStorage.getItem(`icon_pkg_${packageName}`);
+            if (localCachedIcon) {
+                iconCache[packageName] = localCachedIcon;
+                const img = document.getElementById(imgId);
+                if (img) img.src = localCachedIcon;
+                return;
+            }
+
+            // Fetch from native bridge asynchronously
+            setTimeout(() => {
+                if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.getAppIconBase64WebP === 'function') {
+                    try {
+                        const base64 = window.AndroidLauncherBridge.getAppIconBase64WebP(packageName);
+                        if (base64) {
+                            const dataUrl = `data:image/webp;base64,${base64}`;
+                            iconCache[packageName] = dataUrl;
+                            // Persist to web storage for lightning fast local startup
+                            localStorage.setItem(`icon_pkg_${packageName}`, dataUrl);
+                            
+                            const img = document.getElementById(imgId);
+                            if (img) img.src = dataUrl;
+                        }
+                    } catch (e) {
+                        console.error("Error fetching native WebP icon for " + packageName, e);
+                    }
+                } else if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.getAppIconBase64 === 'function') {
+                    try {
+                        const base64 = window.AndroidLauncherBridge.getAppIconBase64(packageName);
+                        if (base64) {
+                            const dataUrl = `data:image/png;base64,${base64}`;
+                            iconCache[packageName] = dataUrl;
+                            // Persist to web storage for lightning fast local startup
+                            localStorage.setItem(`icon_pkg_${packageName}`, dataUrl);
+                            
+                            const img = document.getElementById(imgId);
+                            if (img) img.src = dataUrl;
+                        }
+                    } catch (e) {
+                        console.error("Error fetching native PNG icon for " + packageName, e);
+                    }
+                }
+            }, 0);
+        }
+
+        function renderAll(apps) {
+            // Update total apps count
+            document.getElementById('app-count').innerText = apps.length;
+
+            const searchInput = document.getElementById('search-input');
+            const query = searchInput ? searchInput.value.toLowerCase() : "";
+
+            // Filter apps based on query
+            const filteredApps = apps.filter(app => 
+                app.name.toLowerCase().includes(query) || 
+                app.package_name.toLowerCase().includes(query)
+            );
+
+            // 1. Render Favorites Section
+            const favorites = filteredApps.filter(a => a.is_favorite);
+            const favGrid = document.getElementById('grid-favorites');
+            const favSection = document.getElementById('section-favorites');
+            
+            document.getElementById('count-favorites').innerText = favorites.length;
+
+            if (favorites.length === 0) {
+                favSection.classList.add('hidden');
+            } else {
+                favSection.classList.remove('hidden');
+                favGrid.innerHTML = '';
+                const favFragment = document.createDocumentFragment();
+                favorites.forEach(app => {
+                    favFragment.appendChild(createAppItem(app, 'fav'));
+                });
+                favGrid.appendChild(favFragment);
+            }
+
+            // 2. Render Categorized Sections
+            const container = document.getElementById('categorized-container');
+            container.innerHTML = '';
+
+            // Group apps by category
+            const grouped = {};
+            filteredApps.forEach(app => {
+                const cat = app.category || 'utilities';
+                if (!grouped[cat]) grouped[cat] = [];
+                grouped[cat].push(app);
+            });
+
+            // Sort categories logically
+            const sortedCategories = Object.keys(grouped).sort();
+
+            const containerFragment = document.createDocumentFragment();
+            sortedCategories.forEach(category => {
+                const categoryApps = grouped[category];
+                if (categoryApps.length === 0) return;
+
+                const section = document.createElement('div');
+                section.className = `category-section ${collapsedStates[category] ? 'collapsed' : ''}`;
+                section.id = `sec-${category}`;
+
+                const header = document.createElement('div');
+                header.className = 'category-header';
+                header.onclick = () => toggleCategory(category);
+                header.innerHTML = `
+                    <div class="category-title">
+                        ${getCategoryLabel(category)} 
+                        <span class="category-count">${categoryApps.length}</span>
+                    </div>
+                    <div class="category-chevron">▼</div>
+                `;
+
+                const grid = document.createElement('div');
+                grid.className = 'app-grid';
+                grid.setAttribute('data-category', category);
+
+                const gridFragment = document.createDocumentFragment();
+                categoryApps.forEach(app => {
+                    gridFragment.appendChild(createAppItem(app, 'cat'));
+                });
+                grid.appendChild(gridFragment);
+
+                section.appendChild(header);
+                section.appendChild(grid);
+                containerFragment.appendChild(section);
+            });
+            container.appendChild(containerFragment);
+
+            // Initialize Sortable on each .app-grid inside container
+            document.querySelectorAll('.app-grid').forEach(gridEl => {
+                if (typeof Sortable !== 'undefined') {
+                    new Sortable(gridEl, {
+                        animation: 150,
+                        ghostClass: 'sortable-ghost',
+                        disabled: (document.getElementById('search-input').value.trim() !== ''),
+                        onEnd: function (evt) {
+                            handleGridReorder(evt);
+                        }
+                    });
+                }
+            });
+
+            // Initialize Sortable on #grid-favorites
+            const favGridInstance = document.getElementById('grid-favorites');
+            if (favGridInstance && typeof Sortable !== 'undefined') {
+                new Sortable(favGridInstance, {
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    disabled: (document.getElementById('search-input').value.trim() !== ''),
+                    onEnd: function (evt) {
+                        handleGridReorder(evt);
+                    }
+                });
+            }
+        }
+
+        function createAppItem(app, prefix) {
+            const item = document.createElement('div');
+            item.className = 'app-item';
+            item.setAttribute('data-package', app.package_name);
+            item.onclick = () => {
+                if (window.AndroidLauncherBridge) {
+                    window.AndroidLauncherBridge.launchApp(app.package_name, app.name);
+                } else {
+                    console.log("Launching " + app.package_name);
+                }
+            };
+
+            const imgId = `img_${prefix}_${app.package_name.replace(/\./g, '_')}`;
+            const isStarred = app.is_favorite;
+
+            item.innerHTML = `
+                <div class="icon-wrapper">
+                    <div class="icon-box" style="border-color: ${app.accent_color || app.theme_color || '#3b82f6'}">
+                        <img id="${imgId}" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='2' y='2' width='20' height='20' rx='5' ry='5'></rect><path d='M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z'></path><line x1='17.5' y1='6.5' x2='17.51' y2='6.5'></line></svg>" style="width: 36px; height: 36px; object-fit: contain;" alt="${app.name}" />
+                    </div>
+                    <div class="star-btn ${isStarred ? 'starred' : ''}" onclick="toggleFavorite('${app.package_name}', event)">
+                        ★
+                    </div>
+                </div>
+                <div class="app-label">${app.name}</div>
+            `;
+
+            // Load original high quality native icon asynchronously
+            loadHighQualityIcon(app.package_name, imgId);
+
+            return item;
+        }
+
+        function filterApps() {
+            renderAll(allApps);
+        }
+
+        // --- Notification Center Pipeline ---
+        function fetchNotifications() {
+            if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.getNotificationsJson === 'function') {
+                try {
+                    const json = window.AndroidLauncherBridge.getNotificationsJson();
+                    const list = JSON.parse(json);
+                    renderNotifications(list);
+                } catch(e) {
+                    console.error("Error fetching notifications", e);
+                }
+            } else {
+                // Browser/Preview mockup
+                const mockList = [
+                    {id: "n1", appName: "Piuu Brain", title: "Morning Digest Ready", content: "Weather is 24°C Sunny. You have 2 calendar events today.", timeStr: "09:15 AM", iconName: "brain"},
+                    {id: "n2", appName: "Messages", title: "Alex", content: "Are we still meeting at 3 PM?", timeStr: "08:42 AM", iconName: "message"}
+                ];
+                renderNotifications(mockList);
+            }
+        }
+
+        function renderNotifications(notifs) {
+            const section = document.getElementById('section-notifications');
+            const listContainer = document.getElementById('notifications-list');
+            const countBadge = document.getElementById('count-notifications');
+
+            if (!notifs || notifs.length === 0) {
+                section.classList.add('hidden');
+                return;
+            }
+
+            section.classList.remove('hidden');
+            countBadge.innerText = notifs.length;
+            listContainer.innerHTML = '';
+
+            const notifFragment = document.createDocumentFragment();
+            notifs.forEach(notif => {
+                const item = document.createElement('div');
+                item.className = 'notification-item';
+                
+                let iconSymbol = '🔔';
+                if (notif.iconName === 'brain') iconSymbol = '🧠';
+                else if (notif.iconName === 'message') iconSymbol = '💬';
+                else if (notif.iconName === 'settings') iconSymbol = '⚙️';
+
+                item.innerHTML = `
+                    <div class="notif-icon-box">${iconSymbol}</div>
+                    <div class="notif-details">
+                        <div class="notif-header">
+                            <span class="notif-app-name">${notif.appName}</span>
+                            <span class="notif-time">${notif.timeStr}</span>
+                        </div>
+                        <div class="notif-title">${notif.title}</div>
+                        <div class="notif-content">${notif.content}</div>
+                    </div>
+                    <div class="notif-dismiss" onclick="dismissNotificationWeb('${notif.id}', event)">×</div>
+                `;
+                notifFragment.appendChild(item);
+            });
+            listContainer.appendChild(notifFragment);
+        }
+
+        function dismissNotificationWeb(id, event) {
+            if (event) event.stopPropagation();
+            if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.dismissNotification === 'function') {
+                window.AndroidLauncherBridge.dismissNotification(id);
+                // Optimistic instant UI update
+                setTimeout(fetchNotifications, 50);
+            } else {
+                console.log("Mock dismissal for: " + id);
+            }
+        }
+
+        function clearAllNotificationsWeb(event) {
+            if (event) event.stopPropagation();
+            if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.clearAllNotifications === 'function') {
+                window.AndroidLauncherBridge.clearAllNotifications();
+                setTimeout(fetchNotifications, 50);
+            } else {
+                renderNotifications([]);
+            }
+        }
+
+        function handleGridReorder(evt) {
+            const gridEl = evt.to;
+            const isFav = gridEl.id === 'grid-favorites';
+            
+            if (isFav) {
+                const favoritesOrder = Array.from(gridEl.querySelectorAll('.app-item'))
+                    .map(item => item.getAttribute('data-package'))
+                    .filter(Boolean);
+
+                const favApps = allApps.filter(app => app.is_favorite);
+                favApps.sort((a, b) => {
+                    const indexA = favoritesOrder.indexOf(a.package_name);
+                    const indexB = favoritesOrder.indexOf(b.package_name);
+                    if (indexA === -1 && indexB === -1) return 0;
+                    if (indexA === -1) return 1;
+                    if (indexB === -1) return -1;
+                    return indexA - indexB;
+                });
+
+                let favIndex = 0;
+                allApps = allApps.map(app => {
+                    if (app.is_favorite) {
+                        return favApps[favIndex++];
+                    }
+                    return app;
+                });
+            } else {
+                const category = gridEl.getAttribute('data-category');
+                if (!category) return;
+
+                const packageOrder = Array.from(gridEl.querySelectorAll('.app-item'))
+                    .map(item => item.getAttribute('data-package'))
+                    .filter(Boolean);
+
+                const thisCategoryApps = allApps.filter(app => (app.category || 'utilities') === category);
+                thisCategoryApps.sort((a, b) => {
+                    const indexA = packageOrder.indexOf(a.package_name);
+                    const indexB = packageOrder.indexOf(b.package_name);
+                    if (indexA === -1 && indexB === -1) return 0;
+                    if (indexA === -1) return 1;
+                    if (indexB === -1) return -1;
+                    return indexA - indexB;
+                });
+
+                let catIndex = 0;
+                allApps = allApps.map(app => {
+                    if ((app.category || 'utilities') === category) {
+                        return thisCategoryApps[catIndex++];
+                    }
+                    return app;
+                });
+            }
+
+            localStorage.setItem('piuu_cached_apps', JSON.stringify(allApps));
+
+            const finalOrder = allApps.map(a => a.package_name);
+            if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.updateAppLayout === 'function') {
+                const status = window.AndroidLauncherBridge.updateAppLayout(JSON.stringify(finalOrder));
+                updateSyncStatusUI(status);
+            } else {
+                console.log("Mock update app layout: ", finalOrder);
+                updateSyncStatusUI("synced_to_supabase");
+            }
+        }
+
+        function updateSyncStatusUI(status) {
+            const el = document.getElementById('supabase-sync-status');
+            if (!el) return;
+            
+            let batteryStr = "";
+            if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.getBatteryLevel === 'function') {
+                try {
+                    batteryStr = " (" + window.AndroidLauncherBridge.getBatteryLevel() + "%)";
+                } catch(e) {}
+            }
+
+            if (status === 'paused_low_battery') {
+                el.innerText = 'Sync Paused' + batteryStr;
+                el.style.background = 'rgba(239, 68, 68, 0.15)';
+                el.style.color = '#ef4444';
+                el.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            } else if (status === 'synced_to_supabase' || status === 'sync_success') {
+                el.innerText = 'Cloud Synced' + batteryStr;
+                el.style.background = 'rgba(16, 185, 129, 0.15)';
+                el.style.color = '#10b981';
+                el.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            } else {
+                el.innerText = 'Sync Ready' + batteryStr;
+                el.style.background = 'rgba(148, 163, 184, 0.15)';
+                el.style.color = '#94a3b8';
+                el.style.borderColor = 'rgba(148, 163, 184, 0.3)';
+            }
+        }
+
+        function checkInitialSyncStatus() {
+            if (window.AndroidLauncherBridge && typeof window.AndroidLauncherBridge.syncToSupabase === 'function') {
+                try {
+                    const status = window.AndroidLauncherBridge.syncToSupabase();
+                    updateSyncStatusUI(status);
+                } catch(e) {
+                    updateSyncStatusUI('ready');
+                }
+            } else {
+                updateSyncStatusUI('synced_to_supabase');
+            }
+        }
+
+        // Real-time configuration change handler from native LauncherConfigManager
+        window.onConfigChanged = function(jsonStr) {
+            try {
+                const config = JSON.parse(jsonStr);
+                const root = document.documentElement;
+                if (config.drawerIconSize) {
+                    root.style.setProperty('--icon-size', config.drawerIconSize + 'px');
+                }
+                if (config.drawerColumns) {
+                    root.style.setProperty('--drawer-columns', config.drawerColumns);
+                    document.querySelectorAll('.app-grid').forEach(grid => {
+                        grid.style.gridTemplateColumns = `repeat(${config.drawerColumns}, 1fr)`;
+                    });
+                }
+                if (config.backgroundTransparency !== undefined) {
+                    root.style.setProperty('--card-opacity', config.backgroundTransparency);
+                }
+            } catch(e) {
+                console.error("Error applying config change", e);
+            }
+        };
+
+        // Initialize App Hub
+        function init() {
+            loadInstantWebCache();
+            fetchFreshNativeApps();
+            fetchNotifications();
+            checkInitialSyncStatus();
+            // High refresh rate real-time bridge synchronization (2s intervals)
+            setInterval(fetchNotifications, 2000);
+            // Periodic battery / sync verification (10s intervals)
+            setInterval(checkInitialSyncStatus, 10000);
+        }
+
+        document.addEventListener("DOMContentLoaded", init);
+        window.onload = init;
+    </script>
+</body>
+</html>

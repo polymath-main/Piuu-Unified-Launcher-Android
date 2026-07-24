@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Piuu Neon Pulse Symbol -->
+    <path
+        android:fillColor="#818cf8"
+        android:pathData="M54,28 A26,26 0 1,0 80,54 A26,26 0 0,0 54,28 Z M54,70 A16,16 0 1,1 70,54 A16,16 0 0,1 54,70 Z"/>
+    <path
+        android:fillColor="#c084fc"
+        android:pathData="M54,38 A16,16 0 1,0 70,54 A16,16 0 0,0 54,38 Z"/>
+</vector>
