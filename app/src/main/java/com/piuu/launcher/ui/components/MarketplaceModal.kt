@@ -16,10 +16,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.piuu.launcher.R
+import com.piuu.launcher.marketplace.MarketplaceCore
+import com.piuu.launcher.marketplace.PiuuPluginSdk
 import com.piuu.launcher.model.MarketplaceItem
 import com.piuu.launcher.model.LauncherTheme
 import com.piuu.launcher.repository.AiEngine
@@ -35,9 +40,14 @@ fun MarketplaceModal(
     aiEngine: AiEngine? = null,
     onDismiss: () -> Unit,
     onApplyAiTheme: ((LauncherTheme) -> Unit)? = null,
-    onInstallItem: (MarketplaceItem) -> Unit
+    onInstallItem: (MarketplaceItem) -> Unit,
+    onPreviewTheme: ((MarketplaceItem) -> Unit)? = null
 ) {
     if (!visible) return
+
+    val context = LocalContext.current
+    val marketplaceCore = remember { MarketplaceCore.getInstance(context) }
+    val installedPlugins by marketplaceCore.installedPluginsFlow.collectAsState()
 
     var selectedTab by remember { mutableStateOf("all") }
     var searchQuery by remember { mutableStateOf("") }
@@ -45,10 +55,32 @@ fun MarketplaceModal(
     var isGeneratingAiTheme by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    val tabs = listOf("all", "theming", "fonts", "layouts", "faces", "widgets", "icons", "agents", "skills")
+    val tabs = listOf("all", "theming", "fonts", "layouts", "faces", "widgets", "icons", "agents", "skills", "sdk_sandbox")
+
+    var customManifestJson by remember {
+        mutableStateOf("""{
+  "id": "custom_dev_widget",
+  "name": "Live Dev Telemetry",
+  "version": "1.0.0",
+  "category": "widgets",
+  "type": "WIDGET",
+  "author": "Piuu Developer",
+  "description": "Realtime CPU & Storage Monitor",
+  "permissions": ["system_stats", "persistent_storage"]
+}""".trimIndent())
+    }
+
+    var customPayloadJson by remember {
+        mutableStateOf("""{
+  "metric_type": "battery_storage",
+  "chart_type": "gauge"
+}""".trimIndent())
+    }
+
+    var sdkTestOutput by remember { mutableStateOf("Ready to execute Marketplace Core SDK commands...") }
 
     val filteredItems = catalog.filter { item ->
-        val matchesCategory = if (selectedTab == "all") true else item.category.equals(selectedTab, ignoreCase = true)
+        val matchesCategory = if (selectedTab == "all" || selectedTab == "sdk_sandbox") true else item.category.equals(selectedTab, ignoreCase = true)
         val matchesQuery = searchQuery.isBlank() ||
                 item.name.contains(searchQuery, ignoreCase = true) ||
                 item.description.contains(searchQuery, ignoreCase = true) ||
@@ -80,17 +112,26 @@ fun MarketplaceModal(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(38.dp)
                                 .clip(CircleShape)
                                 .background(PrimaryBlue.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(imageVector = Icons.Default.ShoppingBag, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                            Icon(imageVector = Icons.Default.ShoppingBag, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(22.dp))
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text("Piuu Marketplace", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                            Text("Schemes, Themes, Fonts & AI Agents", fontSize = 11.sp, color = TextMuted)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Piuu Marketplace", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    color = SuccessGreen.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text("CORE SDK v2.1", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = SuccessGreen, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                }
+                            }
+                            Text("Extensible Schemes, Themes, Widgets & Custom Plugins", fontSize = 11.sp, color = TextMuted)
                         }
                     }
                     IconButton(onClick = onDismiss) {
@@ -98,13 +139,56 @@ fun MarketplaceModal(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Marketplace Core Engine Telemetry Bar
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, LauncherBorder, RoundedCornerShape(14.dp))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Column {
+                                Text("Catalog Items", fontSize = 10.sp, color = TextMuted)
+                                Text("${catalog.size}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                            }
+                            Column {
+                                Text("Active Plugins", fontSize = 10.sp, color = TextMuted)
+                                Text("${installedPlugins.count { it.isInstalled }}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SuccessGreen)
+                            }
+                            Column {
+                                Text("SDK Sandbox", fontSize = 10.sp, color = TextMuted)
+                                Text("Isolated", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AccentPurple)
+                            }
+                        }
+
+                        TextButton(
+                            onClick = { selectedTab = "sdk_sandbox" },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(Icons.Default.Code, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("SDK Dev Hub", fontSize = 11.sp, color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Search Field
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search themes, fonts, layouts...", color = TextMuted, fontSize = 13.sp) },
+                    placeholder = { Text("Search themes, fonts, widgets, extensions...", color = TextMuted, fontSize = 13.sp) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextMuted) },
                     trailingIcon = if (searchQuery.isNotEmpty()) {
                         { IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = null, tint = TextMuted) } }
@@ -136,7 +220,11 @@ fun MarketplaceModal(
                             onClick = { selectedTab = tab },
                             text = {
                                 Text(
-                                    text = tab.replaceFirstChar { it.uppercase() },
+                                    text = when (tab) {
+                                        "all" -> "All Schemes"
+                                        "sdk_sandbox" -> "⚡ SDK Sandbox"
+                                        else -> tab.replaceFirstChar { it.uppercase() }
+                                    },
                                     color = if (selectedTab == tab) PrimaryBlue else TextSecondary,
                                     fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Normal,
                                     fontSize = 13.sp
@@ -212,7 +300,150 @@ fun MarketplaceModal(
                         }
                     }
 
-                    if (filteredItems.isEmpty()) {
+                    // SDK Sandbox Inspector Tab
+                    if (selectedTab == "sdk_sandbox") {
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                                shape = RoundedCornerShape(18.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, PrimaryBlue, RoundedCornerShape(18.dp))
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Terminal, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Marketplace Core SDK Sandbox", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                        }
+                                        Surface(color = PrimaryBlue.copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp)) {
+                                            Text("v2.1.0 Engine", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                        }
+                                    }
+                                    Text("Test custom plugin manifests, permissions, and runtime SDK sandbox invocation.", fontSize = 11.sp, color = TextMuted)
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Direct SDK Quick Action Buttons
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Button(
+                                            onClick = {
+                                                val dummyPlugin = com.piuu.launcher.marketplace.MarketplacePlugin(
+                                                    manifest = com.piuu.launcher.marketplace.MarketplacePluginManifest(
+                                                        id = "telemetry_demo",
+                                                        name = "System Telemetry",
+                                                        permissions = listOf("system_stats")
+                                                    )
+                                                )
+                                                val res = PiuuPluginSdk.getSystemMetrics(context, dummyPlugin)
+                                                sdkTestOutput = "SDK getSystemMetrics():\nSuccess: ${res.success}\nMessage: ${res.message}\nData: ${res.data}"
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue.copy(alpha = 0.2f)),
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Text("Run Metrics API", fontSize = 11.sp, color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                val (valid, manifest) = PiuuPluginSdk.validateManifest(customManifestJson)
+                                                sdkTestOutput = "Manifest Validation:\nValid: $valid\nParsed Manifest: $manifest"
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = AccentPurple.copy(alpha = 0.2f)),
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Text("Validate Manifest", fontSize = 11.sp, color = AccentPurple, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text("Plugin Manifest JSON:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                                    OutlinedTextField(
+                                        value = customManifestJson,
+                                        onValueChange = { customManifestJson = it },
+                                        modifier = Modifier.fillMaxWidth().height(110.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedContainerColor = Color.Black.copy(alpha = 0.4f),
+                                            unfocusedContainerColor = Color.Black.copy(alpha = 0.4f),
+                                            focusedTextColor = PrimaryBlue,
+                                            unfocusedTextColor = TextPrimary
+                                        )
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("Plugin Payload JSON:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                                    OutlinedTextField(
+                                        value = customPayloadJson,
+                                        onValueChange = { customPayloadJson = it },
+                                        modifier = Modifier.fillMaxWidth().height(80.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedContainerColor = Color.Black.copy(alpha = 0.4f),
+                                            unfocusedContainerColor = Color.Black.copy(alpha = 0.4f),
+                                            focusedTextColor = PrimaryBlue,
+                                            unfocusedTextColor = TextPrimary
+                                        )
+                                    )
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Button(
+                                        onClick = {
+                                            val (valid, manifest) = com.piuu.launcher.marketplace.PiuuPluginSdk.validateManifest(customManifestJson)
+                                            if (valid && manifest != null) {
+                                                val dummyItem = MarketplaceItem(
+                                                    id = manifest.id,
+                                                    name = manifest.name,
+                                                    category = manifest.category,
+                                                    author = manifest.author,
+                                                    rating = manifest.rating,
+                                                    downloads = manifest.downloads,
+                                                    description = manifest.description,
+                                                    preview_badge = "SDK Sandbox",
+                                                    payload = customPayloadJson,
+                                                    is_installed = true
+                                                )
+                                                onInstallItem(dummyItem)
+                                                sdkTestOutput = "Registered & Installed custom SDK plugin '${manifest.name}' [ID: ${manifest.id}]"
+                                            } else {
+                                                sdkTestOutput = "Validation Failed: Invalid JSON or missing manifest parameters."
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text("Register & Install Custom Plugin", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder))
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    Text("Interactive SDK Output:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(Color.Black)
+                                            .padding(10.dp)
+                                    ) {
+                                        Text(sdkTestOutput, fontSize = 11.sp, color = SuccessGreen)
+                                    }
+                                }
+                            }
+                        }
+                    } else if (filteredItems.isEmpty()) {
                         item {
                             Box(
                                 modifier = Modifier
@@ -225,7 +456,18 @@ fun MarketplaceModal(
                         }
                     } else {
                         items(filteredItems, key = { it.id }) { item ->
-                            MarketplaceCardItem(item = item, onInstall = { onInstallItem(item) })
+                            MarketplaceCardItem(
+                                item = item,
+                                onInstall = { onInstallItem(item) },
+                                onPreview = if (onPreviewTheme != null && (item.category.lowercase() == "theming" || item.category.lowercase() == "themes")) {
+                                    { onPreviewTheme(item) }
+                                } else null,
+                                onSdkTestAction = { action ->
+                                    val res = marketplaceCore.executePluginSdkAction(item.id, action)
+                                    sdkTestOutput = "Executed '$action' on ${item.name}:\nSuccess: ${res.success}\nData: ${res.data}"
+                                    selectedTab = "sdk_sandbox"
+                                }
+                            )
                         }
                     }
                 }
@@ -235,7 +477,12 @@ fun MarketplaceModal(
 }
 
 @Composable
-fun MarketplaceCardItem(item: MarketplaceItem, onInstall: () -> Unit) {
+fun MarketplaceCardItem(
+    item: MarketplaceItem,
+    onInstall: () -> Unit,
+    onPreview: (() -> Unit)? = null,
+    onSdkTestAction: ((String) -> Unit)? = null
+) {
     Card(
         colors = CardDefaults.cardColors(containerColor = CardGlassBg),
         shape = RoundedCornerShape(18.dp),
@@ -310,32 +557,93 @@ fun MarketplaceCardItem(item: MarketplaceItem, onInstall: () -> Unit) {
                     Text("${item.author} • ⭐ ${item.rating} (${item.downloads} downloads)", fontSize = 11.sp, color = TextMuted)
                 }
 
-                // Action Button
-                Button(
-                    onClick = onInstall,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (item.is_installed) SuccessGreen.copy(alpha = 0.18f) else PrimaryBlue
-                    ),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                // Action Buttons Row
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (item.is_installed) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
+                    if (onPreview != null) {
+                        OutlinedButton(
+                            onClick = onPreview,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlue),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = PrimaryBlue
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Visibility, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = stringResource(id = R.string.btn_preview),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
-                        Text(
-                            text = if (item.is_installed) "Applied" else "Apply",
-                            color = if (item.is_installed) SuccessGreen else Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    }
+
+                    Button(
+                        onClick = onInstall,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (item.is_installed) SuccessGreen.copy(alpha = 0.18f) else PrimaryBlue
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (item.is_installed) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                            }
+                            Text(
+                                text = if (item.is_installed) "Applied" else "Apply",
+                                color = if (item.is_installed) SuccessGreen else Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
             Text(item.description, fontSize = 12.sp, color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Permission & Capability Badges
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(color = LauncherGlass, shape = RoundedCornerShape(6.dp)) {
+                    Text("SDK v2.1", fontSize = 9.sp, color = TextMuted, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                }
+                Surface(color = PrimaryBlue.copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp)) {
+                    Text("Sandboxed", fontSize = 9.sp, color = PrimaryBlue, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                }
+                if (item.category.lowercase() in listOf("widgets", "faces", "agents")) {
+                    Surface(color = AccentPurple.copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp)) {
+                        Text("SYSTEM_STATS", fontSize = 9.sp, color = AccentPurple, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                if (onSdkTestAction != null) {
+                    TextButton(
+                        onClick = { onSdkTestAction("inspect_manifest") },
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Icon(Icons.Default.BugReport, contentDescription = null, tint = AccentPurple, modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("SDK Test", fontSize = 10.sp, color = AccentPurple)
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 

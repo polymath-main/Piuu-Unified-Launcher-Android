@@ -11,6 +11,7 @@ import android.widget.Toast
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.piuu.launcher.model.*
+import org.json.JSONObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -294,6 +295,58 @@ class LauncherJsBridge(
         drawable.setBounds(0, 0, canvas.width, canvas.height)
         drawable.draw(canvas)
         return bitmap
+    }
+
+    // ── Marketplace Core & SDK Bridge API ───────────────────────────────────────
+    @JavascriptInterface
+    fun getMarketplaceCatalog(): String {
+        return try {
+            val catalog = repository.getMarketplaceCatalog()
+            gson.toJson(catalog)
+        } catch (e: Exception) {
+            "[]"
+        }
+    }
+
+    @JavascriptInterface
+    fun installMarketplacePlugin(itemJson: String): String {
+        return try {
+            val item = gson.fromJson(itemJson, MarketplaceItem::class.java)
+            val (success, msg) = repository.installMarketplacePlugin(item)
+            JSONObject().put("success", success).put("message", msg).toString()
+        } catch (e: Exception) {
+            JSONObject().put("success", false).put("message", e.localizedMessage ?: "Parse Error").toString()
+        }
+    }
+
+    @JavascriptInterface
+    fun uninstallMarketplacePlugin(pluginId: String): String {
+        return try {
+            val (success, msg) = repository.uninstallMarketplacePlugin(pluginId)
+            JSONObject().put("success", success).put("message", msg).toString()
+        } catch (e: Exception) {
+            JSONObject().put("success", false).put("message", e.localizedMessage ?: "Error").toString()
+        }
+    }
+
+    @JavascriptInterface
+    fun registerCustomSdkPlugin(manifestJson: String, payloadJson: String): String {
+        return try {
+            val (success, msg) = repository.registerCustomPlugin(manifestJson, payloadJson)
+            JSONObject().put("success", success).put("message", msg).toString()
+        } catch (e: Exception) {
+            JSONObject().put("success", false).put("message", e.localizedMessage ?: "Error").toString()
+        }
+    }
+
+    @JavascriptInterface
+    fun executePluginSdkAction(pluginId: String, actionName: String): String {
+        return try {
+            val res = repository.executePluginSdkAction(pluginId, actionName)
+            gson.toJson(res)
+        } catch (e: Exception) {
+            JSONObject().put("success", false).put("message", e.localizedMessage ?: "Error").toString()
+        }
     }
 
     // ── SchemeStore API ─────────────────────────────────────────────────────────

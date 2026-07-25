@@ -31,9 +31,33 @@ class LauncherPreferenceManager(context: Context) {
         get() = prefs.getString(KEY_GESTURE_SWIPE_RIGHT, "WEB_VIEW") ?: "WEB_VIEW"
         set(value) = prefs.edit().putString(KEY_GESTURE_SWIPE_RIGHT, value).apply()
 
+    var gestureEdgeSwipe: String
+        get() = prefs.getString(KEY_GESTURE_EDGE_SWIPE, "NOTIFICATION_CENTER") ?: "NOTIFICATION_CENTER"
+        set(value) = prefs.edit().putString(KEY_GESTURE_EDGE_SWIPE, value).apply()
+
     var drawerColumnCount: Int
         get() = prefs.getInt(KEY_DRAWER_COLUMN_COUNT, 4)
         set(value) = prefs.edit().putInt(KEY_DRAWER_COLUMN_COUNT, value).apply()
+
+    var drawerScrollMode: String
+        get() = prefs.getString(KEY_DRAWER_SCROLL_MODE, "VERTICAL") ?: "VERTICAL"
+        set(value) = prefs.edit().putString(KEY_DRAWER_SCROLL_MODE, value).apply()
+
+    var dockIconCount: Int
+        get() = prefs.getInt(KEY_DOCK_ICON_COUNT, 5)
+        set(value) = prefs.edit().putInt(KEY_DOCK_ICON_COUNT, value).apply()
+
+    var dockBackgroundStyle: String
+        get() = prefs.getString(KEY_DOCK_BG_STYLE, "GLASS") ?: "GLASS"
+        set(value) = prefs.edit().putString(KEY_DOCK_BG_STYLE, value).apply()
+
+    var dockShowLabels: Boolean
+        get() = prefs.getBoolean(KEY_DOCK_SHOW_LABELS, false)
+        set(value) = prefs.edit().putBoolean(KEY_DOCK_SHOW_LABELS, value).apply()
+
+    var dockVisible: Boolean
+        get() = prefs.getBoolean(KEY_DOCK_VISIBLE, true)
+        set(value) = prefs.edit().putBoolean(KEY_DOCK_VISIBLE, value).apply()
 
     var drawerShowFrequentlyUsed: Boolean
         get() = prefs.getBoolean(KEY_DRAWER_SHOW_FREQUENTLY_USED, true)
@@ -54,13 +78,20 @@ class LauncherPreferenceManager(context: Context) {
         private const val KEY_GESTURE_DOUBLE_TAP = "key_gesture_double_tap"
         private const val KEY_GESTURE_SWIPE_LEFT = "key_gesture_swipe_left"
         private const val KEY_GESTURE_SWIPE_RIGHT = "key_gesture_swipe_right"
+        private const val KEY_GESTURE_EDGE_SWIPE = "key_gesture_edge_swipe"
         private const val KEY_DRAWER_COLUMN_COUNT = "key_drawer_column_count"
+        private const val KEY_DRAWER_SCROLL_MODE = "key_drawer_scroll_mode"
+        private const val KEY_DOCK_ICON_COUNT = "key_dock_icon_count"
+        private const val KEY_DOCK_BG_STYLE = "key_dock_bg_style"
+        private const val KEY_DOCK_SHOW_LABELS = "key_dock_show_labels"
+        private const val KEY_DOCK_VISIBLE = "key_dock_visible"
         private const val KEY_DRAWER_SHOW_FREQUENTLY_USED = "key_drawer_show_frequently_used"
         private const val KEY_DRAWER_SHOW_CATEGORIES = "key_drawer_show_categories"
         private const val KEY_IS_DARK_MODE = "key_is_dark_mode"
 
         val GESTURE_ACTIONS = listOf(
             "DRAWER" to "Open App Drawer",
+            "NOTIFICATION_CENTER" to "Toggle Notification Center",
             "SEARCH" to "Global Search",
             "BRAIN_CHAT" to "AI Brain Chat",
             "QUICK_SETTINGS" to "Quick Settings",

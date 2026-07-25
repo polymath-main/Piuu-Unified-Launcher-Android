@@ -3,6 +3,7 @@ package com.piuu.launcher.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -24,17 +25,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import com.piuu.launcher.model.SystemApp
 import com.piuu.launcher.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun AppDrawer(
     visible: Boolean,
     apps: List<SystemApp>,
     onDismiss: () -> Unit,
     onLaunchApp: (SystemApp) -> Unit,
-    onToggleFavorite: (SystemApp) -> Unit
+    onToggleFavorite: (SystemApp) -> Unit,
+    onLongPressApp: (SystemApp) -> Unit,
+    onAutoCategorize: (() -> Unit) -> Unit = {}
 ) {
     if (!visible) return
 
@@ -110,7 +115,59 @@ fun AppDrawer(
 
             // Category Chips Row
             if (showCategories) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    item {
+                        var isCategorizing by remember { mutableStateOf(false) }
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        
+                        FilterChip(
+                            selected = false,
+                            onClick = {
+                                if (!isCategorizing) {
+                                    isCategorizing = true
+                                    onAutoCategorize {
+                                        isCategorizing = false
+                                        android.widget.Toast.makeText(context, "Apps successfully categorized by AI!", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            label = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (isCategorizing) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(12.dp),
+                                            strokeWidth = 1.5.dp,
+                                            color = TextPrimary
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("AI Tagging...", color = PrimaryBlue, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            tint = PrimaryBlue,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("AI Organize", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
+                                    }
+                                }
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = CardGlassBg,
+                                selectedContainerColor = CardGlassBg
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = false,
+                                borderColor = PrimaryBlue.copy(alpha = 0.6f)
+                            )
+                        )
+                    }
+
                     items(categories) { category ->
                         val isSelected = category == selectedCategory
                         FilterChip(
@@ -140,7 +197,10 @@ fun AppDrawer(
                     items(frequentApps) { app ->
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.clickable { onLaunchApp(app) }
+                            modifier = Modifier.combinedClickable(
+                                onClick = { onLaunchApp(app) },
+                                onLongClick = { onLongPressApp(app) }
+                            )
                         ) {
                             Box(
                                 modifier = Modifier
@@ -167,18 +227,73 @@ fun AppDrawer(
             Text("All Apps (${filteredApps.size})", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
             Spacer(modifier = Modifier.height(8.dp))
 
-            // App Grid
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(columnCount),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(filteredApps) { app ->
-                    AppGridTileItem(
-                        app = app,
-                        onClick = { onLaunchApp(app) }
-                    )
+            // App Grid with scroll mode support
+            val scrollMode = prefManager.drawerScrollMode
+            if (scrollMode == "HORIZONTAL") {
+                val itemsPerPage = (columnCount * 4).coerceAtLeast(8)
+                val pagesOfApps = filteredApps.chunked(itemsPerPage)
+                if (pagesOfApps.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No apps found", color = TextMuted)
+                    }
+                } else {
+                    val pagerState = rememberPagerState(pageCount = { pagesOfApps.size })
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.weight(1f)
+                        ) { pageIdx ->
+                            val pageApps = pagesOfApps[pageIdx]
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(columnCount),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(pageApps) { app ->
+                                    AppGridTileItem(
+                                        app = app,
+                                        onClick = { onLaunchApp(app) },
+                                        onLongClick = { onLongPressApp(app) }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Page indicator
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            repeat(pagesOfApps.size) { idx ->
+                                val active = pagerState.currentPage == idx
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 4.dp)
+                                        .clip(CircleShape)
+                                        .background(if (active) PrimaryBlue else TextMuted.copy(alpha = 0.4f))
+                                        .size(if (active) 8.dp else 5.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(columnCount),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(filteredApps) { app ->
+                        AppGridTileItem(
+                            app = app,
+                            onClick = { onLaunchApp(app) },
+                            onLongClick = { onLongPressApp(app) }
+                        )
+                    }
                 }
             }
         }
@@ -186,11 +301,15 @@ fun AppDrawer(
 }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun AppGridTileItem(app: SystemApp, onClick: () -> Unit) {
+fun AppGridTileItem(app: SystemApp, onClick: () -> Unit, onLongClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }
+        modifier = Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClick = onLongClick
+        )
     ) {
         BadgedBox(
             badge = {

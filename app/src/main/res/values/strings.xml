@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Piuu Launcher</string>
+    <string name="btn_preview">Preview</string>
+    <string name="preview_active_banner">Theme Preview Active: %1$s</string>
+    <string name="btn_keep_theme">Keep</string>
+    <string name="btn_revert_theme">Revert</string>
+    <string name="toast_preview_applied">Temporary Preview Applied!</string>
+    <string name="toast_preview_saved">Theme saved permanently!</string>
+    <string name="toast_preview_reverted">Theme preview reverted.</string>
 </resources>

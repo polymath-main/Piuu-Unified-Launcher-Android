@@ -1,8 +1,10 @@
 package com.piuu.launcher.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,12 +22,31 @@ import androidx.compose.ui.unit.sp
 import com.piuu.launcher.model.SystemApp
 import com.piuu.launcher.ui.theme.*
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DockBar(
     dockApps: List<SystemApp>,
     onLaunchApp: (SystemApp) -> Unit,
-    onOpenDrawer: () -> Unit
+    onOpenDrawer: () -> Unit,
+    onLongPressApp: (SystemApp) -> Unit,
+    dockBackgroundStyle: String = "GLASS",
+    dockShowLabels: Boolean = false,
+    dockVisible: Boolean = true
 ) {
+    if (!dockVisible || dockBackgroundStyle == "HIDDEN") return
+
+    val containerBackground = when (dockBackgroundStyle) {
+        "SOLID" -> Color(0xFF0F172A) // Solid dark navy
+        "TRANSPARENT" -> Color.Transparent
+        else -> LauncherGlass // Glass mode
+    }
+
+    val containerBorder = if (dockBackgroundStyle == "TRANSPARENT") {
+        Modifier
+    } else {
+        Modifier.border(1.dp, LauncherBorder, RoundedCornerShape(28.dp))
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -53,44 +74,76 @@ fun DockBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp))
-                .background(LauncherGlass)
-                .border(1.dp, LauncherBorder, RoundedCornerShape(28.dp))
+                .background(containerBackground)
+                .then(containerBorder)
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
             dockApps.forEach { app ->
-                DockIconItem(app = app, onClick = { onLaunchApp(app) })
+                DockIconItem(
+                    app = app,
+                    showLabels = dockShowLabels,
+                    onClick = { onLaunchApp(app) },
+                    onLongClick = { onLongPressApp(app) }
+                )
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun DockIconItem(app: SystemApp, onClick: () -> Unit) {
-    BadgedBox(
-        badge = {
-            if (app.badge_count > 0) {
-                Badge(containerColor = DangerRed) {
-                    Text("${app.badge_count}", color = Color.White)
+fun DockIconItem(
+    app: SystemApp,
+    showLabels: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        BadgedBox(
+            badge = {
+                if (app.badge_count > 0) {
+                    Badge(containerColor = DangerRed) {
+                        Text("${app.badge_count}", color = Color.White)
+                    }
                 }
             }
-        }
-    ) {
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(CircleShape)
-                .background(PrimaryBlue.copy(alpha = 0.25f))
-                .border(1.dp, PrimaryBlue.copy(alpha = 0.5f), CircleShape)
-                .clickable { onClick() },
-            contentAlignment = Alignment.Center
         ) {
-            com.piuu.launcher.repository.AppIconImage(
-                packageName = app.package_name,
-                modifier = Modifier.size(24.dp),
-                fallbackIconName = app.icon_name,
-                tintColor = if (app.icon_name == "brain") AccentPurple else Color.White
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(PrimaryBlue.copy(alpha = 0.25f))
+                    .border(1.dp, PrimaryBlue.copy(alpha = 0.5f), CircleShape)
+                    .combinedClickable(
+                        onClick = { onClick() },
+                        onLongClick = { onLongClick() }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                com.piuu.launcher.repository.AppIconImage(
+                    packageName = app.package_name,
+                    modifier = Modifier.size(24.dp),
+                    fallbackIconName = app.icon_name,
+                    tintColor = if (app.icon_name == "brain") AccentPurple else Color.White
+                )
+            }
+        }
+        if (showLabels) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = app.name,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                color = TextPrimary,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.width(52.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
     }

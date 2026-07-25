@@ -43,45 +43,32 @@ class LauncherRepository(private val context: Context) {
         SystemApp("com.whatsapp", "WhatsApp", "message", "social", "intent://whatsapp", 340, 14, false, "#25D366", "Instant messaging")
     )
 
-    // ── Marketplace Catalog loaded from SchemeStore ────────────────────────────
+    // ── Marketplace Catalog loaded from MarketplaceCore Engine ────────────────
+    private val marketplaceCore = com.piuu.launcher.marketplace.MarketplaceCore.getInstance(context)
+
     fun getMarketplaceCatalog(currentSchema: LauncherSchema? = null): List<MarketplaceItem> {
         val schema = currentSchema ?: getSchema()
-        val store = SchemeManager.getInstance(context)
-        val categories = listOf("themes", "fonts", "layouts", "faces", "widgets", "icons", "agents", "skills")
-        val items = mutableListOf<MarketplaceItem>()
-        for (category in categories) {
-            val schemes = store.getSchemesForCategory(category)
-            for (scheme in schemes) {
-                val cat = when (category) {
-                    "themes" -> "theming"
-                    else -> category
-                }
+        return marketplaceCore.getFullCatalog(schema)
+    }
 
-                val isApplied = when (cat) {
-                    "theming" -> schema.theme.id == scheme.id
-                    "fonts" -> schema.active_font == scheme.id || schema.theme.font_family.contains(scheme.id.removePrefix("font_"), ignoreCase = true)
-                    "layouts" -> schema.drawer_layout == scheme.id || schema.drawer_layout.contains(scheme.id.removePrefix("layout_"), ignoreCase = true)
-                    "icons" -> schema.active_icon_pack == scheme.id || schema.active_icon_pack.contains(scheme.id.removePrefix("iconpack_"), ignoreCase = true)
-                    else -> schema.installed_plugins.contains(scheme.id)
-                }
+    fun installMarketplacePlugin(item: MarketplaceItem): Pair<Boolean, String> {
+        return marketplaceCore.installPlugin(item)
+    }
 
-                items.add(
-                    MarketplaceItem(
-                        id = scheme.id,
-                        name = scheme.name,
-                        category = cat,
-                        author = scheme.author,
-                        rating = 4.8f,
-                        downloads = 1250,
-                        description = scheme.description,
-                        preview_badge = if (scheme.isCustom) "Custom" else "Official",
-                        payload = scheme.payload,
-                        is_installed = isApplied
-                    )
-                )
-            }
-        }
-        return items
+    fun uninstallMarketplacePlugin(pluginId: String): Pair<Boolean, String> {
+        return marketplaceCore.uninstallPlugin(pluginId)
+    }
+
+    fun toggleMarketplacePluginEnabled(pluginId: String, enable: Boolean): Boolean {
+        return marketplaceCore.togglePluginEnabled(pluginId, enable)
+    }
+
+    fun registerCustomPlugin(manifestJson: String, payloadJson: String): Pair<Boolean, String> {
+        return marketplaceCore.registerCustomPluginFromManifest(manifestJson, payloadJson)
+    }
+
+    fun executePluginSdkAction(pluginId: String, actionName: String): com.piuu.launcher.marketplace.PluginExecutionResult {
+        return marketplaceCore.executePluginSdkAction(pluginId, actionName)
     }
 
     val marketplaceCatalog: List<MarketplaceItem>
@@ -273,6 +260,23 @@ class LauncherRepository(private val context: Context) {
         return String.format("#%02X%02X%02X", (r + 100) % 256, (g + 100) % 256, (b + 100) % 256)
     }
 
+    suspend fun autoCategorizeInstalledApps(aiEngine: AiEngine): List<SystemApp> {
+        val currentApps = getApps()
+        val categorizedPairs = aiEngine.categorizeApps(currentApps)
+        val categoryMap = categorizedPairs.toMap()
+
+        val updatedApps = currentApps.map { app ->
+            val newCat = categoryMap[app.package_name]
+            if (newCat != null) {
+                app.copy(category = newCat)
+            } else {
+                app
+            }
+        }
+        saveApps(updatedApps)
+        return updatedApps
+    }
+
     fun saveApps(apps: List<SystemApp>) {
         prefs.edit().putString("installed_apps", gson.toJson(apps)).apply()
     }
@@ -318,6 +322,27 @@ class LauncherRepository(private val context: Context) {
             apps[index] = app
             saveApps(apps)
         }
+    }
+
+    fun addApp(app: SystemApp): Boolean {
+        val apps = getApps().toMutableList()
+        if (apps.any { it.package_name == app.package_name }) {
+            return false
+        }
+        apps.add(app)
+        saveApps(apps)
+        return true
+    }
+
+    fun deleteApp(packageName: String): Boolean {
+        val apps = getApps().toMutableList()
+        val index = apps.indexOfFirst { it.package_name == packageName }
+        if (index != -1) {
+            apps.removeAt(index)
+            saveApps(apps)
+            return true
+        }
+        return false
     }
 
     // ── Notes persistence ───────────────────────────────────────────────────────

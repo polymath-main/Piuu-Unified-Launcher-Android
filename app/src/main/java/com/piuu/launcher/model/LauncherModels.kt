@@ -14,7 +14,8 @@ enum class ElementType {
     @SerializedName("battery_status") BATTERY_STATUS,
     @SerializedName("system_stats") SYSTEM_STATS,
     @SerializedName("piuu_suite_folder") PIUU_SUITE_FOLDER,
-    @SerializedName("predictive_suggestions") PREDICTIVE_SUGGESTIONS
+    @SerializedName("predictive_suggestions") PREDICTIVE_SUGGESTIONS,
+    @SerializedName("notification_center") NOTIFICATION_CENTER
 }
 
 data class ActionIntent(

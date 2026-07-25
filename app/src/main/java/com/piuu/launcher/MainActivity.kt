@@ -9,21 +9,28 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.piuu.launcher.model.*
 import com.piuu.launcher.repository.AiEngine
 import com.piuu.launcher.repository.LatencyManager
 import com.piuu.launcher.repository.LauncherRepository
 import com.piuu.launcher.repository.NotificationBridge
 import com.piuu.launcher.ui.components.*
-import com.piuu.launcher.ui.theme.PiuuLauncherTheme
+import com.piuu.launcher.ui.theme.*
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -178,6 +185,9 @@ fun LauncherAppMain(
     var showSchemaEditor by remember { mutableStateOf(false) }
     var showWebView by remember { mutableStateOf(false) }
     var showQuickSettings by remember { mutableStateOf(false) }
+    var longPressedApp by remember { mutableStateOf<SystemApp?>(null) }
+    var longPressedElement by remember { mutableStateOf<LauncherElement?>(null) }
+    var previewOriginalTheme by remember { mutableStateOf<LauncherTheme?>(null) }
 
     // Reset Callback for HOME key press
     LaunchedEffect(Unit) {
@@ -190,20 +200,28 @@ fun LauncherAppMain(
             showSchemaEditor = false
             showWebView = false
             showQuickSettings = false
+            longPressedApp = null
+            longPressedElement = null
         }
     }
 
     // Back Button Handler: Close open sheets or do nothing (stay on home launcher)
-    val isAnyOverlayOpen = showDrawer || showBrainChat || showSearch || showMarketplace || showMetrics || showSchemaEditor || showWebView || showQuickSettings
+    val isAnyOverlayOpen = showDrawer || showBrainChat || showSearch || showMarketplace || showMetrics || showSchemaEditor || showWebView || showQuickSettings || (longPressedApp != null) || (longPressedElement != null)
     BackHandler(enabled = isAnyOverlayOpen) {
-        showDrawer = false
-        showBrainChat = false
-        showSearch = false
-        showMarketplace = false
-        showMetrics = false
-        showSchemaEditor = false
-        showWebView = false
-        showQuickSettings = false
+        if (longPressedApp != null) {
+            longPressedApp = null
+        } else if (longPressedElement != null) {
+            longPressedElement = null
+        } else {
+            showDrawer = false
+            showBrainChat = false
+            showSearch = false
+            showMarketplace = false
+            showMetrics = false
+            showSchemaEditor = false
+            showWebView = false
+            showQuickSettings = false
+        }
     }
 
     // Launch App helper with LatencyManager ultra-low latency bridge
@@ -229,6 +247,19 @@ fun LauncherAppMain(
                 if (!launched) {
                     Toast.makeText(context, "Opening ${app.name}...", Toast.LENGTH_SHORT).show()
                 }
+            }
+        }
+    }
+
+    val handleAutoCategorizeApps: (() -> Unit) -> Unit = { onFinished ->
+        coroutineScope.launch {
+            try {
+                val updatedApps = repository.autoCategorizeInstalledApps(aiEngine)
+                apps = updatedApps
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                onFinished()
             }
         }
     }
@@ -280,6 +311,12 @@ fun LauncherAppMain(
                     }
                     notes = updated
                     repository.saveNotes(updated)
+                },
+                onLongPressApp = { longPressedApp = it },
+                onLongPressElement = { longPressedElement = it },
+                onSaveSchema = { updatedSchema ->
+                    schema = updatedSchema
+                    repository.saveSchema(updatedSchema)
                 }
             )
         }
@@ -303,7 +340,12 @@ fun LauncherAppMain(
                     apps = updated
                     repository.saveApps(updated)
                 }
-            }
+            },
+            onLongPressApp = { app ->
+                showDrawer = false
+                longPressedApp = app
+            },
+            onAutoCategorize = handleAutoCategorizeApps
         )
 
         // Brain AI Assistant Chat
@@ -443,10 +485,65 @@ fun LauncherAppMain(
                     }
                 }
 
+                repository.installMarketplacePlugin(item)
+
                 schema = updatedSchema
                 repository.saveSchema(updatedSchema)
-                Toast.makeText(context, "Applied ${item.name} Scheme!", Toast.LENGTH_SHORT).show()
+                previewOriginalTheme = null
+                Toast.makeText(context, "Applied ${item.name} Scheme via SDK!", Toast.LENGTH_SHORT).show()
                 showMarketplace = false
+            },
+            onPreviewTheme = { item ->
+                if (previewOriginalTheme == null) {
+                    previewOriginalTheme = schema.theme
+                }
+
+                val currentTheme = schema.theme
+                var primary = "#3B82F6"
+                var accent = "#8B5CF6"
+                var bg = "rgba(2, 8, 23, 0.85)"
+                var font = currentTheme.font_family
+
+                if (!item.payload.isNullOrBlank()) {
+                    try {
+                        val json = org.json.JSONObject(item.payload)
+                        if (json.has("primary_blue")) primary = json.getString("primary_blue")
+                        else if (json.has("primary_color")) primary = json.getString("primary_color")
+
+                        if (json.has("accent_purple")) accent = json.getString("accent_purple")
+                        else if (json.has("accent_color")) accent = json.getString("accent_color")
+
+                        if (json.has("bg_color")) bg = json.getString("bg_color")
+                        else if (json.has("bg_overlay")) bg = json.getString("bg_overlay")
+                        else if (json.has("card_bg")) bg = json.getString("card_bg")
+
+                        if (json.has("font_family")) font = json.getString("font_family")
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                } else {
+                    val tuple = when (item.id) {
+                        "theme_nord" -> Triple("#3B82F6", "#8B5CF6", "rgba(2, 8, 23, 0.85)")
+                        "theme_cyberpunk" -> Triple("#EC4899", "#06B6D4", "rgba(9, 9, 11, 0.9)")
+                        "theme_slate" -> Triple("#64748B", "#94A3B8", "rgba(18, 18, 18, 0.92)")
+                        "theme_sunset" -> Triple("#F97316", "#A855F7", "rgba(30, 17, 42, 0.88)")
+                        else -> Triple("#3B82F6", "#8B5CF6", "rgba(2, 8, 23, 0.85)")
+                    }
+                    primary = tuple.first
+                    accent = tuple.second
+                    bg = tuple.third
+                }
+
+                val previewTheme = currentTheme.copy(
+                    id = item.id,
+                    name = item.name,
+                    primary_color = primary,
+                    accent_color = accent,
+                    bg_overlay = bg,
+                    font_family = font
+                )
+                schema = schema.copy(theme = previewTheme)
+                Toast.makeText(context, context.getString(com.piuu.launcher.R.string.toast_preview_applied), Toast.LENGTH_SHORT).show()
             }
         )
 
@@ -592,8 +689,125 @@ fun LauncherAppMain(
                 schema = schema.copy(theme = updatedTheme)
                 repository.saveSchema(schema)
                 Toast.makeText(context, if (newIsDark) "Switched to Dark Mode" else "Switched to Light Mode", Toast.LENGTH_SHORT).show()
-            }
+            },
+            onAutoCategorize = handleAutoCategorizeApps
         )
+
+        // Context Menu for Long-Press Interactions
+        AppContextMenuModal(
+            visible = longPressedApp != null,
+            app = longPressedApp ?: SystemApp("", "", "", "", "", 0, 0, false, "", ""),
+            onDismiss = { longPressedApp = null },
+            onUninstallApp = { appToUninstall ->
+                repository.deleteApp(appToUninstall.package_name)
+                apps = repository.getApps()
+                Toast.makeText(context, "'${appToUninstall.name}' uninstalled successfully!", Toast.LENGTH_SHORT).show()
+            },
+            onAddApp = { appToAdd ->
+                repository.addApp(appToAdd)
+                apps = repository.getApps()
+            },
+            onConfigChanged = { updatedConfig ->
+                configManager.config = updatedConfig
+                configState = updatedConfig
+            },
+            onPrefChanged = {
+                apps = repository.getApps()
+            },
+            allApps = apps
+        )
+
+        if (previewOriginalTheme != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(CardGlassBg)
+                    .border(1.5.dp, PrimaryBlue, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(id = R.string.preview_active_banner, schema.theme.name),
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "This theme is applied temporarily.",
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Revert Button
+                        OutlinedButton(
+                            onClick = {
+                                schema = schema.copy(theme = previewOriginalTheme!!)
+                                previewOriginalTheme = null
+                                Toast.makeText(context, context.getString(R.string.toast_preview_reverted), Toast.LENGTH_SHORT).show()
+                            },
+                            border = androidx.compose.foundation.BorderStroke(1.dp, TextMuted),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(stringResource(id = R.string.btn_revert_theme), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        // Keep/Apply Button
+                        Button(
+                            onClick = {
+                                repository.saveSchema(schema)
+                                previewOriginalTheme = null
+                                Toast.makeText(context, context.getString(R.string.toast_preview_saved), Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(stringResource(id = R.string.btn_keep_theme), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Widget Customizer Dialog Overlay
+        if (longPressedElement != null) {
+            WidgetCustomizerModal(
+                element = longPressedElement,
+                onDismiss = { longPressedElement = null },
+                onSaveElement = { updatedElem ->
+                    val updatedPages = schema.pages.map { page ->
+                        val updatedElements = page.elements.map { elem ->
+                            if (elem.element_id == updatedElem.element_id) {
+                                updatedElem
+                            } else {
+                                elem
+                            }
+                        }
+                        page.copy(elements = updatedElements)
+                    }
+                    val updatedSchema = schema.copy(pages = updatedPages)
+                    schema = updatedSchema
+                    repository.saveSchema(updatedSchema)
+                    longPressedElement = null
+                    Toast.makeText(context, "Widget customized!", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
     }
     }
 }

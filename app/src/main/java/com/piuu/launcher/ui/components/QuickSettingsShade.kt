@@ -43,7 +43,8 @@ fun QuickSettingsShade(
     onClearNotifications: () -> Unit,
     onScanApps: () -> Unit,
     isDarkMode: Boolean = true,
-    onToggleDarkMode: ((Boolean) -> Unit)? = null
+    onToggleDarkMode: ((Boolean) -> Unit)? = null,
+    onAutoCategorize: (() -> Unit) -> Unit = {}
 ) {
     if (!visible) return
 
@@ -94,6 +95,7 @@ fun QuickSettingsShade(
     var gestureDoubleTap by remember { mutableStateOf(prefManager.gestureDoubleTap) }
     var gestureSwipeLeft by remember { mutableStateOf(prefManager.gestureSwipeLeft) }
     var gestureSwipeRight by remember { mutableStateOf(prefManager.gestureSwipeRight) }
+    var gestureEdgeSwipe by remember { mutableStateOf(prefManager.gestureEdgeSwipe) }
     var drawerColumnCount by remember { mutableStateOf(prefManager.drawerColumnCount) }
     var drawerShowFrequentlyUsed by remember { mutableStateOf(prefManager.drawerShowFrequentlyUsed) }
     var drawerShowCategories by remember { mutableStateOf(prefManager.drawerShowCategories) }
@@ -430,6 +432,20 @@ fun QuickSettingsShade(
                                 prefManager.gestureSwipeRight = action
                             }
                         )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        GestureRowSetting(
+                            title = "Edge Swipe (Side/Top/Bottom Edge)",
+                            gestureIcon = Icons.Default.Swipe,
+                            currentAction = gestureEdgeSwipe,
+                            onActionSelected = { action ->
+                                gestureEdgeSwipe = action
+                                prefManager.gestureEdgeSwipe = action
+                            }
+                        )
                     }
                 }
 
@@ -547,6 +563,260 @@ fun QuickSettingsShade(
                                     checkedTrackColor = PrimaryBlue.copy(alpha = 0.4f)
                                 )
                             )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Scroll mode selector
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text("Drawer Scroll Direction", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                            Text("Page navigation layout pattern of the app drawer list", fontSize = 11.sp, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                var scrollModeState by remember { mutableStateOf(prefManager.drawerScrollMode) }
+                                listOf("VERTICAL" to "Vertical Grid", "HORIZONTAL" to "Horizontal Paged").forEach { (mode, label) ->
+                                    val isSelected = scrollModeState == mode
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isSelected) PrimaryBlue else CardGlassBg)
+                                            .border(1.dp, if (isSelected) PrimaryBlue else LauncherBorder, RoundedCornerShape(10.dp))
+                                            .clickable {
+                                                scrollModeState = mode
+                                                prefManager.drawerScrollMode = mode
+                                            }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) Color.White else TextPrimary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // AI-Driven Categorization
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("AI Categorization Engine", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                Text("Automatically sort apps into categories like 'Social', 'Productivity', etc., using Gemini AI", fontSize = 11.sp, color = TextSecondary)
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            var isCategorizing by remember { mutableStateOf(false) }
+                            val context = androidx.compose.ui.platform.LocalContext.current
+                            
+                            Button(
+                                onClick = {
+                                    if (!isCategorizing) {
+                                        isCategorizing = true
+                                        onAutoCategorize {
+                                            isCategorizing = false
+                                        }
+                                    }
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isCategorizing) CardGlassBg else PrimaryBlue
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                if (isCategorizing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp,
+                                        color = TextPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Running...", fontSize = 11.sp, color = TextPrimary)
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Run AI", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Dock Customization Card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, LauncherBorder, RoundedCornerShape(20.dp))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Dock Customization Settings", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text("Personalize dock container backdrop, sizes, and labels", fontSize = 11.sp, color = TextSecondary)
+                            }
+                            Icon(imageVector = Icons.Default.Dashboard, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Dock Visibility Switch
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Show Dock Bar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                Text("Toggle visibility of the home screen hotseat dock", fontSize = 11.sp, color = TextSecondary)
+                            }
+                            var dockVisibleState by remember { mutableStateOf(prefManager.dockVisible) }
+                            Switch(
+                                checked = dockVisibleState,
+                                onCheckedChange = { checked ->
+                                    dockVisibleState = checked
+                                    prefManager.dockVisible = checked
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = PrimaryBlue,
+                                    checkedTrackColor = PrimaryBlue.copy(alpha = 0.4f)
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Dock App Labels Switch
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Show App Labels", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                Text("Render small text labels under icons in the dock", fontSize = 11.sp, color = TextSecondary)
+                            }
+                            var dockLabelsState by remember { mutableStateOf(prefManager.dockShowLabels) }
+                            Switch(
+                                checked = dockLabelsState,
+                                onCheckedChange = { checked ->
+                                    dockLabelsState = checked
+                                    prefManager.dockShowLabels = checked
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = PrimaryBlue,
+                                    checkedTrackColor = PrimaryBlue.copy(alpha = 0.4f)
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Dock Max Icons Count
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text("Dock Max Icons count", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                            Text("Select maximum number of apps to fit inside the dock", fontSize = 11.sp, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            var dockIconCountState by remember { mutableStateOf(prefManager.dockIconCount) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf(3, 4, 5, 6).forEach { count ->
+                                    val isSelected = dockIconCountState == count
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isSelected) PrimaryBlue else CardGlassBg)
+                                            .border(1.dp, if (isSelected) PrimaryBlue else LauncherBorder, RoundedCornerShape(10.dp))
+                                            .clickable {
+                                                dockIconCountState = count
+                                                prefManager.dockIconCount = count
+                                            }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "$count Apps",
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) Color.White else TextPrimary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Dock Backdrop Style
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text("Backdrop visual theme", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                            Text("Adjust background material stylings for the dock bar", fontSize = 11.sp, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            var dockBgStyleState by remember { mutableStateOf(prefManager.dockBackgroundStyle) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf("GLASS" to "Frosted", "SOLID" to "Solid Dark", "TRANSPARENT" to "Clear").forEach { (style, label) ->
+                                    val isSelected = dockBgStyleState == style
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isSelected) PrimaryBlue else CardGlassBg)
+                                            .border(1.dp, if (isSelected) PrimaryBlue else LauncherBorder, RoundedCornerShape(10.dp))
+                                            .clickable {
+                                                dockBgStyleState = style
+                                                prefManager.dockBackgroundStyle = style
+                                            }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) Color.White else TextPrimary
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

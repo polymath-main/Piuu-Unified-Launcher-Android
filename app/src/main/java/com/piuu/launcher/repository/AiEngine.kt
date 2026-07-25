@@ -176,8 +176,8 @@ class AiEngine {
         return callGeminiRaw(fullPrompt, apiKey)
     }
 
-    private fun callGeminiRaw(fullPrompt: String, apiKey: String): String {
-        val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey")
+    private fun callGeminiRaw(fullPrompt: String, apiKey: String, modelName: String = "gemini-1.5-flash"): String {
+        val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey")
         val conn = url.openConnection() as HttpURLConnection
         conn.requestMethod = "POST"
         conn.setRequestProperty("Content-Type", "application/json")
@@ -216,6 +216,103 @@ class AiEngine {
             }
         }
         return ""
+    }
+
+    /**
+     * AI-driven app categorization: Uses LLM-based tagging with automatic offline local clustering fallback.
+     */
+    suspend fun categorizeApps(
+        apps: List<com.piuu.launcher.model.SystemApp>
+    ): List<Pair<String, String>> = withContext(Dispatchers.IO) {
+        val apiKey = getApiKey()
+        if (apiKey.isNotBlank()) {
+            try {
+                val appDetails = apps.joinToString(separator = "\n") { app ->
+                    "- Package: ${app.package_name}, Name: ${app.name}, Description: ${app.description}"
+                }
+
+                val sysPrompt = """
+                    You are an expert AI-driven app classifier for Piuu Launcher.
+                    Categorize each of the following apps into exactly one of these categories:
+                    "social", "productivity", "entertainment", "utilities", "system", "creative", "finance", "piuu_suite".
+
+                    Follow these rules strictly:
+                    1. If the package name starts with "com.piuu.", classify it as "piuu_suite".
+                    2. If the app is a messaging/chat/social media app, use "social".
+                    3. If the app is a work, email, calendar, notes, or office document tool, use "productivity".
+                    4. If the app is a media player, video, music, podcast, or game, use "entertainment".
+                    5. If the app is a web browser, calculator, clock, weather, maps, or utility, use "utilities".
+                    6. If the app is a photo editor, drawing app, or camera, use "creative".
+                    7. If the app is a system settings or low-level file manager, use "system".
+
+                    Apps list to classify:
+                    $appDetails
+
+                    Respond ONLY with a valid JSON array of objects, each containing:
+                    "packageName" (string) and "category" (string).
+                    No markdown wrappers, no ```json formatting, no other text.
+                """.trimIndent()
+
+                val apiResponse = callGeminiRaw(sysPrompt, apiKey, "gemini-3.5-flash")
+                val cleanJson = apiResponse.replace("```json", "").replace("```", "").trim()
+
+                if (cleanJson.startsWith("[") && cleanJson.endsWith("]")) {
+                    val type = object : com.google.gson.reflect.TypeToken<List<Map<String, String>>>() {}.type
+                    val resultList: List<Map<String, String>> = gson.fromJson(cleanJson, type)
+                    return@withContext resultList.mapNotNull { map ->
+                        val pkg = map["packageName"]
+                        val cat = map["category"]?.lowercase(Locale.ROOT)
+                        if (pkg != null && cat != null) {
+                            pkg to cat
+                        } else {
+                            null
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // Fallback local keyword clustering / similarity tagging
+        return@withContext apps.map { app ->
+            val cat = localClusteringCategorize(app)
+            app.package_name to cat
+        }
+    }
+
+    private fun localClusteringCategorize(app: com.piuu.launcher.model.SystemApp): String {
+        val pkg = app.package_name.lowercase(Locale.ROOT)
+        val name = app.name.lowercase(Locale.ROOT)
+        val desc = app.description.lowercase(Locale.ROOT)
+
+        if (pkg.startsWith("com.piuu.")) return "piuu_suite"
+
+        val keywords = mapOf(
+            "social" to listOf("social", "instagram", "twitter", "facebook", "whatsapp", "telegram", "messenger", "snapchat", "tiktok", "linkedin", "discord", "reddit", "chat", "message", "meet", "talk", "comm", "contact", "friend", "mms", "phone", "dialer"),
+            "productivity" to listOf("mail", "gmail", "calendar", "note", "doc", "sheet", "task", "keep", "office", "todo", "pdf", "word", "excel", "ppt", "slide", "write", "editor", "work", "organize", "schedule", "suite", "ide", "editor", "text"),
+            "entertainment" to listOf("youtube", "spotify", "music", "video", "netflix", "game", "stream", "media", "player", "audio", "sound", "radio", "podcast", "movie", "tv", "show", "watch", "play", "gaming", "fun"),
+            "utilities" to listOf("chrome", "browser", "calc", "weather", "clock", "tool", "utility", "map", "alarm", "stopwatch", "timer", "search", "compass", "gps", "navigate", "network", "wifi", "web", "internet", "radar"),
+            "creative" to listOf("camera", "photo", "design", "edit", "canvas", "paint", "draw", "art", "studio", "sketch", "image", "gallery", "lens", "capture", "filter", "collage"),
+            "system" to listOf("settings", "files", "system", "installer", "backup", "security", "cleaner", "device", "process", "package", "shell", "terminal", "root", "explorer", "manager", "documentsui"),
+            "finance" to listOf("bank", "wallet", "crypto", "budget", "finance", "pay", "card", "money", "invest", "stock", "cash", "ledger", "coin")
+        )
+
+        val scores = mutableMapOf<String, Int>()
+        keywords.forEach { (category, words) ->
+            var score = 0
+            words.forEach { word ->
+                if (name.contains(word)) score += 3
+                if (desc.contains(word)) score += 2
+                if (pkg.contains(word)) score += 1
+            }
+            if (score > 0) {
+                scores[category] = score
+            }
+        }
+
+        val highestMatch = scores.maxByOrNull { it.value }?.key
+        return highestMatch ?: "utilities"
     }
 
     private fun currentTimeString(): String {
