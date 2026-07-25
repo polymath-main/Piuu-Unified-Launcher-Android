@@ -83,6 +83,22 @@ class LauncherPreferenceManager(context: Context) {
         get() = prefs.getFloat(KEY_APP_DRAWER_TRANSPARENCY, 0.7f)
         set(value) = prefs.edit().putFloat(KEY_APP_DRAWER_TRANSPARENCY, value).apply()
 
+    var drawerBackgroundColor: String
+        get() = prefs.getString(KEY_DRAWER_BG_COLOR, "#020817") ?: "#020817"
+        set(value) = prefs.edit().putString(KEY_DRAWER_BG_COLOR, value).apply()
+
+    var drawerShowLabels: Boolean
+        get() = prefs.getBoolean(KEY_DRAWER_SHOW_LABELS, false)
+        set(value) = prefs.edit().putBoolean(KEY_DRAWER_SHOW_LABELS, value).apply()
+
+    var drawerHandleVisible: Boolean
+        get() = prefs.getBoolean(KEY_DRAWER_HANDLE_VISIBLE, true)
+        set(value) = prefs.edit().putBoolean(KEY_DRAWER_HANDLE_VISIBLE, value).apply()
+
+    var dockIconSize: Int
+        get() = prefs.getInt(KEY_DOCK_ICON_SIZE, 52)
+        set(value) = prefs.edit().putInt(KEY_DOCK_ICON_SIZE, value).apply()
+
     companion object {
         private const val KEY_ICON_PACK_PACKAGE_NAME = "key_icon_pack_package_name"
         private const val KEY_GESTURE_SWIPE_UP = "key_gesture_swipe_up"
@@ -103,6 +119,10 @@ class LauncherPreferenceManager(context: Context) {
         private const val KEY_WALLPAPER_TRANSPARENCY = "key_wallpaper_transparency"
         private const val KEY_APP_DRAWER_BLUR = "key_app_drawer_blur"
         private const val KEY_APP_DRAWER_TRANSPARENCY = "key_app_drawer_transparency"
+        private const val KEY_DRAWER_BG_COLOR = "key_drawer_bg_color"
+        private const val KEY_DRAWER_SHOW_LABELS = "key_drawer_show_labels"
+        private const val KEY_DRAWER_HANDLE_VISIBLE = "key_drawer_handle_visible"
+        private const val KEY_DOCK_ICON_SIZE = "key_dock_icon_size"
 
         val GESTURE_ACTIONS = listOf(
             "DRAWER" to "Open App Drawer",

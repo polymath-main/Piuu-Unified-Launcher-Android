@@ -34,6 +34,15 @@ fun GlobalSearchModal(
     if (!visible) return
 
     var query by remember { mutableStateOf("") }
+    var recentQueries by remember { mutableStateOf(listOf("Marketplace", "Brain", "WiFi", "Metrics")) }
+
+    val updateRecentSearches: () -> Unit = {
+        if (query.isNotBlank()) {
+            val trimmed = query.trim()
+            val updated = (listOf(trimmed) + recentQueries.filter { it.lowercase() != trimmed.lowercase() }).take(4)
+            recentQueries = updated
+        }
+    }
 
     val appResults = apps.filter { it.name.contains(query, ignoreCase = true) }.take(4)
 
@@ -92,6 +101,75 @@ fun GlobalSearchModal(
             Spacer(modifier = Modifier.height(16.dp))
 
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (query.isEmpty()) {
+                    // Dynamic top 4 used apps
+                    val popularApps = apps.sortedByDescending { it.usage_count }.take(4)
+                    if (popularApps.isNotEmpty()) {
+                        item {
+                            Text("Popular Shortcuts", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                popularApps.forEach { app ->
+                                    AssistChip(
+                                        onClick = { onLaunchApp(app); onDismiss() },
+                                        label = { Text(app.name, fontSize = 11.sp, color = TextPrimary) },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Apps,
+                                                contentDescription = null,
+                                                tint = PrimaryBlue,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        },
+                                        colors = AssistChipDefaults.assistChipColors(
+                                            containerColor = CardGlassBg,
+                                            labelColor = TextPrimary
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+
+                    // Interactive recent searches
+                    if (recentQueries.isNotEmpty()) {
+                        item {
+                            Text("Recent Searches", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                recentQueries.forEach { q ->
+                                    SuggestionChip(
+                                        onClick = { query = q },
+                                        label = { Text(q, fontSize = 11.sp, color = TextPrimary) },
+                                        icon = {
+                                            Icon(
+                                                imageVector = Icons.Default.History,
+                                                contentDescription = null,
+                                                tint = TextMuted,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        },
+                                        colors = SuggestionChipDefaults.suggestionChipColors(
+                                            containerColor = CardGlassBg,
+                                            labelColor = TextPrimary
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                }
+
                 if (appResults.isNotEmpty()) {
                     item {
                         Text("Matching Apps", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
@@ -102,7 +180,11 @@ fun GlobalSearchModal(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(CardGlassBg)
-                                .clickable { onLaunchApp(app); onDismiss() }
+                                .clickable {
+                                    updateRecentSearches()
+                                    onLaunchApp(app)
+                                    onDismiss()
+                                }
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -135,7 +217,10 @@ fun GlobalSearchModal(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(CardGlassBg)
-                                .clickable { onDismiss() }
+                                .clickable {
+                                    updateRecentSearches()
+                                    onDismiss()
+                                }
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)

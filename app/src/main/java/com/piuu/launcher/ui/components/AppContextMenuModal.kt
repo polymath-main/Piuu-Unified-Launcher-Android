@@ -162,7 +162,10 @@ fun AppContextMenuModal(
                             onUninstall = {
                                 onUninstallApp(app)
                                 onDismiss()
-                            }
+                            },
+                            allApps = allApps,
+                            onPrefChanged = onPrefChanged,
+                            onDismiss = onDismiss
                         )
                         "create_folder" -> CreateFolderSection(
                             app = app,
@@ -202,7 +205,13 @@ fun AppContextMenuModal(
 
 // ── 1. App Info Panel ────────────────────────────────────────────────────────
 @Composable
-fun AppInfoSection(app: SystemApp, onUninstall: () -> Unit) {
+fun AppInfoSection(
+    app: SystemApp,
+    onUninstall: () -> Unit,
+    allApps: List<SystemApp>,
+    onPrefChanged: () -> Unit,
+    onDismiss: () -> Unit
+) {
     val context = LocalContext.current
     var showUninstallConfirm by remember { mutableStateOf(false) }
 
@@ -291,6 +300,229 @@ fun AppInfoSection(app: SystemApp, onUninstall: () -> Unit) {
 
                 Text("Application Summary", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextMuted)
                 Text(app.description.ifBlank { "No description available for this package." }, fontSize = 13.sp, color = TextPrimary)
+            }
+        }
+
+        val repository = remember { com.piuu.launcher.repository.LauncherRepository(context) }
+        val isCurrentlyHidden = remember(app) { repository.getHiddenApps().contains(app.package_name) }
+        val isPinnedToDock = remember(app) { repository.getSchema().dock.app_packages.contains(app.package_name) }
+
+        // Row for Quick Action Buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Button(
+                onClick = {
+                    try {
+                        val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = android.net.Uri.parse("package:${app.package_name}")
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "System settings not available for simulated package: ${app.name}", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("App Info", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+
+            Button(
+                onClick = {
+                    if (isCurrentlyHidden) {
+                        repository.unhideApp(app.package_name)
+                        Toast.makeText(context, "${app.name} is now visible.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        repository.hideApp(app.package_name)
+                        Toast.makeText(context, "${app.name} is now hidden.", Toast.LENGTH_SHORT).show()
+                    }
+                    onPrefChanged()
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = if (isCurrentlyHidden) SuccessGreen else AccentPurple),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(
+                    imageVector = if (isCurrentlyHidden) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(if (isCurrentlyHidden) "Unhide" else "Hide", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        }
+
+        // Row 2 for Shortcut & Dock actions
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Button(
+                onClick = {
+                    val success = repository.addShortcutToHome(app.package_name, app.name)
+                    if (success) {
+                        Toast.makeText(context, "Added shortcut for ${app.name} to Home screen.", Toast.LENGTH_SHORT).show()
+                        onPrefChanged()
+                        onDismiss()
+                    } else {
+                        Toast.makeText(context, "Failed to add shortcut.", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Add to Home", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+
+            Button(
+                onClick = {
+                    val success = repository.togglePinDock(app.package_name)
+                    if (success) {
+                        val msg = if (isPinnedToDock) "Removed ${app.name} from Dock." else "Pinned ${app.name} to Dock."
+                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                        onPrefChanged()
+                        onDismiss()
+                    } else {
+                        Toast.makeText(context, "Failed to update Dock.", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = if (isPinnedToDock) DangerRed else PrimaryBlue),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(
+                    imageVector = if (isPinnedToDock) Icons.Default.LinkOff else Icons.Default.Link,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(if (isPinnedToDock) "Unpin Dock" else "Pin Dock", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        }
+
+        // Row 3 for Play Store & Uninstall actions
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Button(
+                onClick = {
+                    try {
+                        val playStoreIntent = android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("market://details?id=${app.package_name}")
+                        ).apply {
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(playStoreIntent)
+                    } catch (e: Exception) {
+                        // Fallback to Web browser URL if market:// handler is not present
+                        try {
+                            val webIntent = android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse("https://play.google.com/store/apps/details?id=${app.package_name}")
+                            ).apply {
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(webIntent)
+                        } catch (ex: Exception) {
+                            Toast.makeText(context, "Cannot open Play Store for ${app.name}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = AccentPurple),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Shop, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Play Store", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+
+            Button(
+                onClick = {
+                    try {
+                        val uninstallIntent = android.content.Intent(
+                            android.content.Intent.ACTION_DELETE,
+                            android.net.Uri.parse("package:${app.package_name}")
+                        ).apply {
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(uninstallIntent)
+                        onUninstall()
+                    } catch (e: Exception) {
+                        onUninstall()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Uninstall", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        }
+
+        val hiddenList = remember { repository.getHiddenApps() }
+        val hiddenAppObjects = allApps.filter { it.package_name in hiddenList }
+
+        if (hiddenAppObjects.isNotEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Hidden Applications Manager", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                    Text("These apps are hidden from your homescreen and drawer. Tap 'Unhide' to restore them.", fontSize = 11.sp, color = TextMuted)
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    hiddenAppObjects.forEach { hiddenApp ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(PrimaryBlue.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(imageVector = Icons.Default.Apps, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(14.dp))
+                                }
+                                Text(hiddenApp.name, fontSize = 13.sp, color = TextPrimary)
+                            }
+                            TextButton(
+                                onClick = {
+                                    repository.unhideApp(hiddenApp.package_name)
+                                    Toast.makeText(context, "${hiddenApp.name} is now visible.", Toast.LENGTH_SHORT).show()
+                                    onPrefChanged()
+                                }
+                            ) {
+                                Text("Unhide", fontSize = 12.sp, color = SuccessGreen, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -829,6 +1061,148 @@ fun IconConfigSection(
                         onCheckedChange = {
                             showCategories = it
                             prefManager.drawerShowCategories = it
+                            onPrefChanged()
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Divider(color = LauncherBorder)
+                Spacer(modifier = Modifier.height(4.dp))
+
+                var drawerTransparency by remember { mutableStateOf(prefManager.appDrawerTransparency) }
+                Text("Background Transparency: ${(drawerTransparency * 100).toInt()}%", fontSize = 12.sp, color = TextMuted)
+                Slider(
+                    value = drawerTransparency,
+                    onValueChange = {
+                        drawerTransparency = it
+                        prefManager.appDrawerTransparency = it
+                        onPrefChanged()
+                    },
+                    valueRange = 0.0f..1.0f,
+                    colors = SliderDefaults.colors(activeTrackColor = PrimaryBlue, thumbColor = PrimaryBlue)
+                )
+
+                Text("Background Color Preset", fontSize = 12.sp, color = TextMuted)
+                val presets = listOf(
+                    "#020817" to "Neural",
+                    "#0A0A0A" to "Midnight",
+                    "#1E1E38" to "Indigo",
+                    "#2E1B4E" to "Cyberpunk",
+                    "#321010" to "Crimson"
+                )
+                var activeColorHex by remember { mutableStateOf(prefManager.drawerBackgroundColor) }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                ) {
+                    presets.forEach { (hex, name) ->
+                        val parsedColor = parseHexColor(hex, Color.DarkGray)
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(parsedColor)
+                                .border(
+                                    width = if (activeColorHex == hex) 2.dp else 1.dp,
+                                    color = if (activeColorHex == hex) PrimaryBlue else Color.Transparent,
+                                    shape = CircleShape
+                                )
+                                .clickable {
+                                    activeColorHex = hex
+                                    prefManager.drawerBackgroundColor = hex
+                                    onPrefChanged()
+                                }
+                        )
+                    }
+                }
+
+                var showDrawerLabels by remember { mutableStateOf(prefManager.drawerShowLabels) }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Show Drawer App Labels", fontSize = 13.sp, color = TextPrimary)
+                    Switch(
+                        checked = showDrawerLabels,
+                        onCheckedChange = {
+                            showDrawerLabels = it
+                            prefManager.drawerShowLabels = it
+                            onPrefChanged()
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue)
+                    )
+                }
+            }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+            modifier = Modifier.fillMaxWidth().border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text("Custom Dock Configurations", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+
+                var dockIconsCount by remember { mutableStateOf(prefManager.dockIconCount) }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Dock Maximum Apps: $dockIconsCount", fontSize = 13.sp, color = TextPrimary)
+                    Row {
+                        IconButton(onClick = { if (dockIconsCount > 3) { dockIconsCount--; prefManager.dockIconCount = dockIconsCount; onPrefChanged() } }) {
+                            Icon(imageVector = Icons.Default.RemoveCircleOutline, contentDescription = null, tint = TextSecondary)
+                        }
+                        IconButton(onClick = { if (dockIconsCount < 7) { dockIconsCount++; prefManager.dockIconCount = dockIconsCount; onPrefChanged() } }) {
+                            Icon(imageVector = Icons.Default.AddCircleOutline, contentDescription = null, tint = TextSecondary)
+                        }
+                    }
+                }
+
+                var dockSizeSlider by remember { mutableStateOf(prefManager.dockIconSize.toFloat()) }
+                Text("Dock Icon size: ${dockSizeSlider.toInt()} dp", fontSize = 12.sp, color = TextMuted)
+                Slider(
+                    value = dockSizeSlider,
+                    onValueChange = {
+                        dockSizeSlider = it
+                        prefManager.dockIconSize = it.toInt()
+                        onPrefChanged()
+                    },
+                    valueRange = 36.0f..72.0f,
+                    colors = SliderDefaults.colors(activeTrackColor = PrimaryBlue, thumbColor = PrimaryBlue)
+                )
+
+                var dockShowLabels by remember { mutableStateOf(prefManager.dockShowLabels) }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Show Dock Icon Labels", fontSize = 13.sp, color = TextPrimary)
+                    Switch(
+                        checked = dockShowLabels,
+                        onCheckedChange = {
+                            dockShowLabels = it
+                            prefManager.dockShowLabels = it
+                            onPrefChanged()
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue)
+                    )
+                }
+
+                var dockVisible by remember { mutableStateOf(prefManager.dockVisible) }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Dock Bar Visible", fontSize = 13.sp, color = TextPrimary)
+                    Switch(
+                        checked = dockVisible,
+                        onCheckedChange = {
+                            dockVisible = it
+                            prefManager.dockVisible = it
+                            onPrefChanged()
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue)
+                    )
+                }
+
+                var drawerHandleVisible by remember { mutableStateOf(prefManager.drawerHandleVisible) }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Show App Drawer Handle Button", fontSize = 13.sp, color = TextPrimary)
+                    Switch(
+                        checked = drawerHandleVisible,
+                        onCheckedChange = {
+                            drawerHandleVisible = it
+                            prefManager.drawerHandleVisible = it
                             onPrefChanged()
                         },
                         colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue)

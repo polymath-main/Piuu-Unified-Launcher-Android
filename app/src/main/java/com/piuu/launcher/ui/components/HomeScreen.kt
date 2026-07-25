@@ -78,6 +78,7 @@ fun HomeScreen(
     var activeResizingElementId by remember { mutableStateOf<String?>(null) }
     var showActionChooserForElement by remember { mutableStateOf<LauncherElement?>(null) }
     var showHomescreenOptions by remember { mutableStateOf(false) }
+    var showWidgetsDashboard by remember { mutableStateOf(false) }
 
     val currentPrefManager by rememberUpdatedState(prefManager)
 
@@ -271,7 +272,7 @@ fun HomeScreen(
                                 showHomescreenOptions = false
                                 val intent = android.content.Intent(android.content.Intent.ACTION_SET_WALLPAPER)
                                 try {
-                                    context.startActivity(android.content.Intent.createChooser(intent, "Choose Wallpaper Source"))
+                                    context.startActivity(intent)
                                 } catch (e: Exception) {
                                     android.widget.Toast.makeText(context, "No system wallpaper app found", android.widget.Toast.LENGTH_SHORT).show()
                                 }
@@ -300,11 +301,16 @@ fun HomeScreen(
                             Text("Launcher Preferences", color = TextPrimary, fontWeight = FontWeight.Bold)
                         }
 
-                        // Option 3: Edit Widgets (Schema Editor)
+                        // Option 3: Drag & Sizing Mode (Directly on Homescreen)
                         Button(
                             onClick = {
                                 showHomescreenOptions = false
-                                onOpenSchemaEditor()
+                                val firstElemId = pages.firstOrNull()?.elements?.firstOrNull()?.element_id
+                                if (firstElemId != null) {
+                                    activeResizingElementId = firstElemId
+                                } else {
+                                    Toast.makeText(context, "No widgets found to edit. Please add a widget first.", Toast.LENGTH_SHORT).show()
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0x1AFFFFFF)),
                             modifier = Modifier.fillMaxWidth(),
@@ -312,7 +318,22 @@ fun HomeScreen(
                         ) {
                             Icon(imageVector = Icons.Default.Edit, contentDescription = null, tint = TextPrimary)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Edit Widgets & Screens", color = TextPrimary, fontWeight = FontWeight.Bold)
+                            Text("Edit Layout (Drag & Sizing)", color = TextPrimary, fontWeight = FontWeight.Bold)
+                        }
+
+                        // Option 4: Add Widget (Open Widgets Dashboard)
+                        Button(
+                            onClick = {
+                                showHomescreenOptions = false
+                                showWidgetsDashboard = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x1AFFFFFF)),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = TextPrimary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Add Widget", color = TextPrimary, fontWeight = FontWeight.Bold)
                         }
 
                         OutlinedButton(
@@ -323,6 +344,200 @@ fun HomeScreen(
                             border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder)
                         ) {
                             Text("Dismiss", color = TextPrimary)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Widgets Dashboard Dialog
+        if (showWidgetsDashboard) {
+            Dialog(onDismissRequest = { showWidgetsDashboard = false }) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = com.piuu.launcher.ui.theme.CardGlassBg.copy(alpha = 0.95f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder),
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.85f)
+                ) {
+                    var selectedTab by remember { mutableStateOf(0) } // 0 = Built-in, 1 = Default/System
+
+                    Column(
+                        modifier = Modifier.padding(20.dp)
+                    ) {
+                        Text(
+                            text = "🧩 Widgets Dashboard",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = "Choose a widget to add to your workspace grid.",
+                            fontSize = 12.sp,
+                            color = TextSecondary,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+
+                        // Tab Selection Row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0x11FFFFFF), RoundedCornerShape(12.dp))
+                                .padding(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (selectedTab == 0) PrimaryBlue else Color.Transparent)
+                                    .clickable { selectedTab = 0 }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Built-in App Widgets", color = if (selectedTab == 0) Color.White else TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (selectedTab == 1) PrimaryBlue else Color.Transparent)
+                                    .clickable { selectedTab = 1 }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("System / Third-Party", color = if (selectedTab == 1) Color.White else TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Scrollable List of widgets
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            if (selectedTab == 0) {
+                                // Built-in App widgets
+                                val builtinWidgets = listOf(
+                                    Triple(ElementType.CLOCK, "Clock Widget", "Displays local current time & customizable clockface styles."),
+                                    Triple(ElementType.WEATHER, "Weather Forecast", "Real-time updates, conditions, and microclimatic forecasts."),
+                                    Triple(ElementType.BATTERY_STATUS, "Battery Widget", "Real-time battery percentage tracking and charge status."),
+                                    Triple(ElementType.SYSTEM_STATS, "Performance Specs", "Monitors system resources like CPU usage, RAM and active storage."),
+                                    Triple(ElementType.MEDIA_PLAYER, "Media Player", "Direct playback, track control, & sound volume levels."),
+                                    Triple(ElementType.AGENT_WIDGET, "AI Brain Widget", "Neural-net assistant insights and quick generative agent cues."),
+                                    Triple(ElementType.QUICK_NOTES, "Sticky Notes", "Instantly write down ideas or bulleted micro-reminders."),
+                                    Triple(ElementType.PIUU_SUITE_FOLDER, "Suite Folder", "Preloaded folder compiling native suite and marketplace tools."),
+                                    Triple(ElementType.PREDICTIVE_SUGGESTIONS, "App Suggestions", "Predictive application recommendations based on routines."),
+                                    Triple(ElementType.NOTIFICATION_CENTER, "Notifications Panel", "Unified feed showing native notifications directly.")
+                                )
+
+                                items(builtinWidgets.size) { index ->
+                                    val (type, name, desc) = builtinWidgets[index]
+                                    WidgetDashboardItemRow(
+                                        name = name,
+                                        desc = desc,
+                                        icon = when (type) {
+                                            ElementType.CLOCK -> Icons.Default.AccessTime
+                                            ElementType.WEATHER -> Icons.Default.Cloud
+                                            ElementType.BATTERY_STATUS -> Icons.Default.BatteryChargingFull
+                                            ElementType.SYSTEM_STATS -> Icons.Default.Memory
+                                            ElementType.MEDIA_PLAYER -> Icons.Default.PlayArrow
+                                            ElementType.AGENT_WIDGET -> Icons.Default.AutoAwesome
+                                            ElementType.QUICK_NOTES -> Icons.Default.EditNote
+                                            ElementType.PIUU_SUITE_FOLDER -> Icons.Default.Folder
+                                            ElementType.PREDICTIVE_SUGGESTIONS -> Icons.Default.Star
+                                            ElementType.NOTIFICATION_CENTER -> Icons.Default.Notifications
+                                            else -> Icons.Default.Apps
+                                        },
+                                        onAdd = {
+                                            val currentPageIndex = pagerState.currentPage
+                                            val targetPage = pages.getOrNull(currentPageIndex)
+                                            if (targetPage != null) {
+                                                val newElem = LauncherElement(
+                                                    element_id = "widget_${type.name.lowercase()}_${java.util.UUID.randomUUID().toString().take(5)}",
+                                                    type = type,
+                                                    title = name,
+                                                    style_props = StyleProps(
+                                                        w = if (type == ElementType.CLOCK || type == ElementType.WEATHER || type == ElementType.MEDIA_PLAYER || type == ElementType.AGENT_WIDGET || type == ElementType.QUICK_NOTES || type == ElementType.NOTIFICATION_CENTER) 4 else 2,
+                                                        h = 2,
+                                                        borderRadius = 20,
+                                                        accentColor = "#3B82F6"
+                                                    )
+                                                )
+                                                val updatedElements = targetPage.elements + newElem
+                                                val updatedPages = pages.mapIndexed { idx, page ->
+                                                    if (idx == currentPageIndex) page.copy(elements = updatedElements) else page
+                                                }
+                                                onSaveSchema(schema.copy(pages = updatedPages))
+                                                Toast.makeText(context, "Added '$name' to your homescreen!", Toast.LENGTH_SHORT).show()
+                                                showWidgetsDashboard = false
+                                            }
+                                        }
+                                    )
+                                }
+                            } else {
+                                // Default / System simulated widgets
+                                val defaultWidgets = listOf(
+                                    Triple("spotify", "Spotify Player", "Integrates Spotify music stream controls on your homescreen directly."),
+                                    Triple("google_search", "Google Search", "Full-width Google Search bar with quick speech dictation capabilities."),
+                                    Triple("google_calendar", "Google Calendar Agenda", "Shows agenda list and meetings directly linked to system calendar.")
+                                )
+
+                                items(defaultWidgets.size) { index ->
+                                    val (id, name, desc) = defaultWidgets[index]
+                                    WidgetDashboardItemRow(
+                                        name = name,
+                                        desc = desc,
+                                        icon = when (id) {
+                                            "spotify" -> Icons.Default.MusicNote
+                                            "google_search" -> Icons.Default.Search
+                                            "google_calendar" -> Icons.Default.CalendarToday
+                                            else -> Icons.Default.Apps
+                                        },
+                                        onAdd = {
+                                            val currentPageIndex = pagerState.currentPage
+                                            val targetPage = pages.getOrNull(currentPageIndex)
+                                            if (targetPage != null) {
+                                                val newElem = LauncherElement(
+                                                    element_id = "syswidget_${id}_${java.util.UUID.randomUUID().toString().take(5)}",
+                                                    type = ElementType.CUSTOM_CARD,
+                                                    title = name,
+                                                    style_props = StyleProps(
+                                                        w = 4,
+                                                        h = 2,
+                                                        borderRadius = 20,
+                                                        accentColor = if (id == "spotify") "#1DB954" else "#3B82F6"
+                                                    ),
+                                                    data_props = mapOf("system_widget_id" to id)
+                                                )
+                                                val updatedElements = targetPage.elements + newElem
+                                                val updatedPages = pages.mapIndexed { idx, page ->
+                                                    if (idx == currentPageIndex) page.copy(elements = updatedElements) else page
+                                                }
+                                                onSaveSchema(schema.copy(pages = updatedPages))
+                                                Toast.makeText(context, "Added system widget '$name'!", Toast.LENGTH_SHORT).show()
+                                                showWidgetsDashboard = false
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedButton(
+                            onClick = { showWidgetsDashboard = false },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder)
+                        ) {
+                            Text("Close", color = TextPrimary)
                         }
                     }
                 }
@@ -768,5 +983,75 @@ fun HomeScreen(
             dockShowLabels = prefManager.dockShowLabels,
             dockVisible = prefManager.dockVisible
         )
+    }
+}
+
+@Composable
+fun WidgetDashboardItemRow(
+    name: String,
+    desc: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onAdd: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0x0AFFFFFF)),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(PrimaryBlue.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = name,
+                        tint = PrimaryBlue,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = name,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = desc,
+                        fontSize = 11.sp,
+                        color = TextSecondary,
+                        maxLines = 2,
+                        lineHeight = 14.sp
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
+                onClick = onAdd,
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Text("Add", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+        }
     }
 }

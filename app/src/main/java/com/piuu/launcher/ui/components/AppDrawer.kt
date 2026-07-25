@@ -46,9 +46,12 @@ fun AppDrawer(
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefManager = remember { com.piuu.launcher.repository.LauncherPreferenceManager.getInstance(context) }
+    val configManager = remember { com.piuu.launcher.repository.LauncherConfigManager.getInstance(context) }
     val showFrequentlyUsed = prefManager.drawerShowFrequentlyUsed
     val showCategories = prefManager.drawerShowCategories
     val columnCount = prefManager.drawerColumnCount
+    val drawerIconSize = configManager.config.drawerIconSize
+    val drawerShowLabels = prefManager.drawerShowLabels
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("all") }
@@ -63,8 +66,15 @@ fun AppDrawer(
 
     val frequentApps = apps.sortedByDescending { it.usage_count }.take(5)
 
-    val appDrawerTransparency = prefManager.appDrawerTransparency
-    val appDrawerBlur = prefManager.appDrawerBlur
+    // Reactive preference state triggers
+    var prefVersion by remember { mutableIntStateOf(0) }
+
+    val appDrawerTransparency = remember(prefManager.appDrawerTransparency, prefVersion) {
+        prefManager.appDrawerTransparency
+    }
+    val customBgColor = remember(prefManager.drawerBackgroundColor, prefVersion) {
+        com.piuu.launcher.ui.theme.parseRgbaOrHexColor(prefManager.drawerBackgroundColor, LauncherBackground)
+    }
 
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
@@ -74,22 +84,32 @@ fun AppDrawer(
             modifier = Modifier.fillMaxSize(),
             color = Color.Transparent
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                // Background Layer with blur and transparency
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f)),
+                contentAlignment = Alignment.Center
+            ) {
+                // Background Customizable Card Container with alpha and border styling
+                val safeAlpha = appDrawerTransparency.coerceIn(0.12f, 1.0f)
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(LauncherBackground.copy(alpha = appDrawerTransparency))
-                        .blur(appDrawerBlur.dp)
-                )
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                        .fillMaxSize(0.94f)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(customBgColor.copy(alpha = safeAlpha))
+                        .border(
+                            width = 1.2.dp,
+                            color = LauncherBorder.copy(alpha = (safeAlpha + 0.2f).coerceAtMost(1.0f)),
+                            shape = RoundedCornerShape(24.dp)
+                        )
                 ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 18.dp, vertical = 18.dp)
+                    ) {
                 // Header Search Input & Close Button Row
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -210,27 +230,37 @@ fun AppDrawer(
                     items(frequentApps, key = { it.package_name }) { app ->
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.combinedClickable(
+                            modifier = Modifier.longPressPulseEffect(
                                 onClick = { onLaunchApp(app) },
                                 onLongClick = { onLongPressApp(app) }
                             )
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(drawerIconSize.dp)
                                     .clip(CircleShape)
                                     .background(AccentPurple.copy(alpha = 0.25f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 com.piuu.launcher.repository.AppIconImage(
                                     packageName = app.package_name,
-                                    modifier = Modifier.size(22.dp),
+                                    modifier = Modifier.size((drawerIconSize * 0.46f).dp),
                                     fallbackIconName = app.icon_name,
                                     tintColor = AccentPurple
                                 )
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = app.name, fontSize = 11.sp, color = TextPrimary, maxLines = 1)
+                            if (drawerShowLabels) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = app.name,
+                                    fontSize = 11.sp,
+                                    color = TextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.width(drawerIconSize.dp),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
@@ -266,6 +296,8 @@ fun AppDrawer(
                                 items(pageApps, key = { it.package_name }) { app ->
                                     AppGridTileItem(
                                         app = app,
+                                        iconSize = drawerIconSize,
+                                        showLabels = drawerShowLabels,
                                         onClick = { onLaunchApp(app) },
                                         onLongClick = { onLongPressApp(app) }
                                     )
@@ -303,6 +335,8 @@ fun AppDrawer(
                     items(filteredApps, key = { it.package_name }) { app ->
                         AppGridTileItem(
                             app = app,
+                            iconSize = drawerIconSize,
+                            showLabels = drawerShowLabels,
                             onClick = { onLaunchApp(app) },
                             onLongClick = { onLongPressApp(app) }
                         )
@@ -314,13 +348,19 @@ fun AppDrawer(
 }
 }
 }
+}
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun AppGridTileItem(app: SystemApp, onClick: () -> Unit, onLongClick: () -> Unit) {
+fun AppGridTileItem(
+    app: SystemApp,
+    iconSize: Int,
+    showLabels: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.combinedClickable(
+        modifier = Modifier.longPressPulseEffect(
             onClick = onClick,
             onLongClick = onLongClick
         )
@@ -334,7 +374,7 @@ fun AppGridTileItem(app: SystemApp, onClick: () -> Unit, onLongClick: () -> Unit
         ) {
             Box(
                 modifier = Modifier
-                    .size(54.dp)
+                    .size(iconSize.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(CardGlassBg)
                     .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp)),
@@ -342,22 +382,25 @@ fun AppGridTileItem(app: SystemApp, onClick: () -> Unit, onLongClick: () -> Unit
             ) {
                 com.piuu.launcher.repository.AppIconImage(
                     packageName = app.package_name,
-                    modifier = Modifier.size(26.dp),
+                    modifier = Modifier.size((iconSize * 0.48f).dp),
                     fallbackIconName = app.icon_name,
                     tintColor = if (app.category == "piuu_suite") SuccessGreen else PrimaryBlue
                 )
             }
         }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = app.name,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = TextPrimary,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        if (showLabels) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = app.name,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = TextPrimary,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.width(iconSize.dp)
+            )
+        }
     }
 }
 

@@ -344,6 +344,82 @@ fun QuickSettingsShade(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Floating Overlay (Draw Over Other Apps) PIP Card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, LauncherBorder, RoundedCornerShape(20.dp))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Draw Over / Floating PIP Window", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text("Maintain PIP music/video & chat heads while using other apps", fontSize = 11.sp, color = TextSecondary)
+                            }
+                            Icon(imageVector = Icons.Default.PictureInPicture, contentDescription = null, tint = AccentPurple, modifier = Modifier.size(20.dp))
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        var isOverlayActive by remember {
+                            mutableStateOf(com.piuu.launcher.isServiceRunning(context, com.piuu.launcher.repository.FloatingOverlayService::class.java))
+                        }
+                        val canDrawOver = remember { android.provider.Settings.canDrawOverlays(context) }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Seamless PIP Overlay Engine", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                Text(
+                                    if (canDrawOver) "Permission Granted • Active floating window" else "Requires 'Draw over other apps' permission",
+                                    fontSize = 11.sp,
+                                    color = if (canDrawOver) SuccessGreen else WarningAmber
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Switch(
+                                checked = isOverlayActive,
+                                onCheckedChange = {
+                                    com.piuu.launcher.toggleFloatingOverlay(context)
+                                    isOverlayActive = com.piuu.launcher.isServiceRunning(context, com.piuu.launcher.repository.FloatingOverlayService::class.java)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = PrimaryBlue,
+                                    checkedTrackColor = PrimaryBlue.copy(alpha = 0.4f)
+                                )
+                            )
+                        }
+
+                        if (!canDrawOver) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(
+                                onClick = {
+                                    com.piuu.launcher.toggleFloatingOverlay(context)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = WarningAmber),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(imageVector = Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Grant Draw Over Permission", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // Homescreen Gestures Configuration Card
                 Card(
                     colors = CardDefaults.cardColors(containerColor = CardGlassBg),
@@ -609,7 +685,64 @@ fun QuickSettingsShade(
                         Box(Modifier.fillMaxWidth().height(1.dp).background(LauncherBorder.copy(alpha = 0.3f)))
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // AI-Driven Categorization
+                        // Drawer Background Card Customization
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            var drawerTrans by remember { mutableStateOf(prefManager.appDrawerTransparency) }
+                            Text("Background Card Transparency: ${(drawerTrans * 100).toInt()}%", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                            Text("Adjust opacity of the drawer backdrop card", fontSize = 11.sp, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Slider(
+                                value = drawerTrans,
+                                onValueChange = {
+                                    drawerTrans = it
+                                    prefManager.appDrawerTransparency = it
+                                },
+                                valueRange = 0.1f..1.0f,
+                                colors = SliderDefaults.colors(activeTrackColor = PrimaryBlue, thumbColor = PrimaryBlue)
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text("Drawer Backdrop Theme Color", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                            var drawerBgHex by remember { mutableStateOf(prefManager.drawerBackgroundColor) }
+                            val colorPresets = listOf(
+                                "#020817" to "Slate",
+                                "#0A0A0A" to "Midnight",
+                                "#1E1E38" to "Indigo",
+                                "#2E1B4E" to "Cyberpunk",
+                                "#321010" to "Crimson"
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                colorPresets.forEach { (hex, name) ->
+                                    val parsed = com.piuu.launcher.ui.theme.parseRgbaOrHexColor(hex, PrimaryBlue)
+                                    val isSel = drawerBgHex == hex
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(32.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(parsed)
+                                            .border(
+                                                width = if (isSel) 2.dp else 1.dp,
+                                                color = if (isSel) PrimaryBlue else LauncherBorder,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            .clickable {
+                                                drawerBgHex = hex
+                                                prefManager.drawerBackgroundColor = hex
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(name, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    }
+                                }
+                            }
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,

@@ -530,21 +530,22 @@ fun MarketplaceCardItem(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Category Icon Badge
+                val badgeGradient = remember(item.category, activePrimaryColor, activeAccentColor) {
+                    when (item.category.lowercase()) {
+                        "theming", "themes" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activePrimaryColor, activeAccentColor))
+                        "fonts" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activeAccentColor, Color(0xFFC084FC)))
+                        "layouts" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(SuccessGreen, Color(0xFF34D399)))
+                        "faces", "widgets" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(WarningAmber, Color(0xFFFBBF24)))
+                        "icons" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activePrimaryColor, Color(0xFF60A5FA)))
+                        "agents" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activeAccentColor, Color(0xFFF472B6)))
+                        else -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activePrimaryColor, SuccessGreen))
+                    }
+                }
                 Box(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            when (item.category.lowercase()) {
-                                "theming", "themes" -> PrimaryBlue
-                                "fonts" -> AccentPurple
-                                "layouts" -> SuccessGreen
-                                "faces", "widgets" -> WarningAmber
-                                "icons" -> PrimaryBlue
-                                "agents" -> AccentPurple
-                                else -> SuccessGreen
-                            }
-                        ),
+                        .background(badgeGradient),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -866,13 +867,7 @@ fun ItemPreviewWidget(item: MarketplaceItem) {
                 }
             }
             "icons" -> {
-                var glowColor = PrimaryBlue
-                if (!item.payload.isNullOrBlank()) {
-                    try {
-                        val json = JSONObject(item.payload)
-                        glowColor = parseHexColor(json.optString("primary_glow", "#3B82F6"), PrimaryBlue)
-                    } catch (_: Exception) {}
-                }
+                val packId = item.id.lowercase()
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -880,15 +875,93 @@ fun ItemPreviewWidget(item: MarketplaceItem) {
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(Icons.Default.Phone, Icons.Default.CameraAlt, Icons.Default.Settings).forEach { icon ->
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(CircleShape)
-                                    .background(glowColor.copy(alpha = 0.2f))
-                                    .border(1.dp, glowColor, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(imageVector = icon, contentDescription = null, tint = glowColor, modifier = Modifier.size(12.dp))
+                            when {
+                                packId.contains("neon") -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF0F172A))
+                                            .border(1.5.dp, Color(0xFF06B6D4), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(imageVector = icon, contentDescription = null, tint = Color(0xFF06B6D4), modifier = Modifier.size(13.dp))
+                                    }
+                                }
+                                packId.contains("pastel") -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0xFFFDE2E4)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(imageVector = icon, contentDescription = null, tint = Color(0xFF475569), modifier = Modifier.size(13.dp))
+                                    }
+                                }
+                                packId.contains("monochrome") || packId.contains("wireframe") -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF09090B))
+                                            .border(1.dp, Color.White.copy(alpha = 0.7f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                    }
+                                }
+                                packId.contains("pixel") -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(Color(0xFFEF4444))
+                                            .border(1.5.dp, Color.Black, RoundedCornerShape(4.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                    }
+                                }
+                                packId.contains("gold") -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                androidx.compose.ui.graphics.Brush.linearGradient(
+                                                    listOf(Color(0xFFFCD34D), Color(0xFFD97706))
+                                                )
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(imageVector = icon, contentDescription = null, tint = Color(0xFF451A03), modifier = Modifier.size(13.dp))
+                                    }
+                                }
+                                packId.contains("vintage") -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(Color(0xFFF5E6CA))
+                                            .border(1.dp, Color(0xFFD4B499), RoundedCornerShape(6.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(imageVector = icon, contentDescription = null, tint = Color(0xFF5C3D2E), modifier = Modifier.size(13.dp))
+                                    }
+                                }
+                                else -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(activePrimaryColor.copy(alpha = 0.2f))
+                                            .border(1.dp, activePrimaryColor, RoundedCornerShape(8.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(imageVector = icon, contentDescription = null, tint = activePrimaryColor, modifier = Modifier.size(13.dp))
+                                    }
+                                }
                             }
                         }
                     }

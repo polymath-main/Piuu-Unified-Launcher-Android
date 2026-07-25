@@ -11,7 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,21 +53,27 @@ fun DockBar(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Swipe Up Handle Indicator
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(LauncherGlass)
-                .clickable { onOpenDrawer() }
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Swipe up", tint = TextSecondary, modifier = Modifier.size(16.dp))
-            Text("App Drawer", fontSize = 11.sp, color = TextSecondary, fontWeight = FontWeight.Medium)
-        }
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val prefManager = remember { com.piuu.launcher.repository.LauncherPreferenceManager.getInstance(context) }
+        val dockIconSize = prefManager.dockIconSize
 
-        Spacer(modifier = Modifier.height(8.dp))
+        // Swipe Up Handle Indicator
+        if (prefManager.drawerHandleVisible) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(LauncherGlass)
+                    .clickable { onOpenDrawer() }
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Swipe up", tint = TextSecondary, modifier = Modifier.size(16.dp))
+                Text("App Drawer", fontSize = 11.sp, color = TextSecondary, fontWeight = FontWeight.Medium)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         // Main Dock Container
         Row(
@@ -84,6 +90,7 @@ fun DockBar(
                 DockIconItem(
                     app = app,
                     showLabels = dockShowLabels,
+                    iconSize = dockIconSize,
                     onClick = { onLaunchApp(app) },
                     onLongClick = { onLongPressApp(app) }
                 )
@@ -92,11 +99,11 @@ fun DockBar(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DockIconItem(
     app: SystemApp,
     showLabels: Boolean,
+    iconSize: Int,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
@@ -115,11 +122,11 @@ fun DockIconItem(
         ) {
             Box(
                 modifier = Modifier
-                    .size(52.dp)
+                    .size(iconSize.dp)
                     .clip(CircleShape)
                     .background(PrimaryBlue.copy(alpha = 0.25f))
                     .border(1.dp, PrimaryBlue.copy(alpha = 0.5f), CircleShape)
-                    .combinedClickable(
+                    .longPressPulseEffect(
                         onClick = { onClick() },
                         onLongClick = { onLongClick() }
                     ),
@@ -127,7 +134,7 @@ fun DockIconItem(
             ) {
                 com.piuu.launcher.repository.AppIconImage(
                     packageName = app.package_name,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size((iconSize * 0.46f).dp),
                     fallbackIconName = app.icon_name,
                     tintColor = if (app.icon_name == "brain") AccentPurple else Color.White
                 )
@@ -142,7 +149,7 @@ fun DockIconItem(
                 color = TextPrimary,
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                modifier = Modifier.width(52.dp),
+                modifier = Modifier.width(iconSize.dp),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }

@@ -4,6 +4,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import kotlinx.coroutines.launch
 
 // Global theme state for dynamic updates across all legacy references
 var isDarkMode by mutableStateOf(true)
@@ -64,5 +72,48 @@ fun parseRgbaOrHexColor(colorStr: String, defaultColor: Color): Color {
         } catch (_: Exception) {}
     }
     return defaultColor
+}
+
+@Composable
+fun Modifier.longPressPulseEffect(
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+): Modifier {
+    val coroutineScope = rememberCoroutineScope()
+    val scale = remember { androidx.compose.animation.core.Animatable(1f) }
+
+    return this
+        .graphicsLayer(
+            scaleX = scale.value,
+            scaleY = scale.value
+        )
+        .pointerInput(onClick, onLongClick) {
+            detectTapGestures(
+                onPress = {
+                    try {
+                        scale.animateTo(0.88f, animationSpec = androidx.compose.animation.core.tween(120))
+                        val released = tryAwaitRelease()
+                        if (released) {
+                            scale.animateTo(1.06f, animationSpec = androidx.compose.animation.core.tween(80))
+                            scale.animateTo(1f, animationSpec = androidx.compose.animation.core.tween(80))
+                            onClick()
+                        } else {
+                            scale.animateTo(1f, animationSpec = androidx.compose.animation.core.tween(120))
+                        }
+                    } catch (e: Exception) {
+                        scale.snapTo(1f)
+                    }
+                },
+                onLongPress = {
+                    coroutineScope.launch {
+                        scale.animateTo(1.22f, animationSpec = androidx.compose.animation.core.tween(100))
+                        scale.animateTo(0.94f, animationSpec = androidx.compose.animation.core.tween(80))
+                        scale.animateTo(1.05f, animationSpec = androidx.compose.animation.core.tween(80))
+                        scale.animateTo(1f, animationSpec = androidx.compose.animation.core.tween(100))
+                        onLongClick()
+                    }
+                }
+            )
+        }
 }
 

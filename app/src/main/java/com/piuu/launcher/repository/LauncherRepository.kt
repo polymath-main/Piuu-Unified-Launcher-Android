@@ -106,6 +106,83 @@ class LauncherRepository(private val context: Context) {
         prefs.edit().putString("launcher_schema", gson.toJson(schema)).apply()
     }
 
+    fun addShortcutToHome(packageName: String, appName: String): Boolean {
+        try {
+            val schema = getSchema()
+            if (schema.pages.isEmpty()) return false
+            val firstPage = schema.pages.first()
+            val elements = firstPage.elements.toMutableList()
+
+            // Find a vacant spot in a 4x6 grid (cols x rows)
+            val cols = schema.pages.firstOrNull()?.elements?.maxOfOrNull { it.style_props.x ?: 0 }?.plus(2)?.coerceIn(4, 5) ?: 4
+            val rows = 6
+            var vacantX = -1
+            var vacantY = -1
+
+            for (y in 0 until rows) {
+                for (x in 0 until cols) {
+                    // Check overlap
+                    val hasOverlap = elements.any { elem ->
+                        val ex = elem.style_props.x ?: 0
+                        val ey = elem.style_props.y ?: 0
+                        val ew = elem.style_props.w ?: 1
+                        val eh = elem.style_props.h ?: 1
+                        x >= ex && x < ex + ew && y >= ey && y < ey + eh
+                    }
+                    if (!hasOverlap) {
+                        vacantX = x
+                        vacantY = y
+                        break
+                    }
+                }
+                if (vacantX != -1) break
+            }
+
+            if (vacantX == -1) {
+                val maxY = elements.maxOfOrNull { (it.style_props.y ?: 0) + (it.style_props.h ?: 1) } ?: 0
+                vacantX = 0
+                vacantY = maxY
+            }
+
+            val newElement = LauncherElement(
+                element_id = "elem_${System.currentTimeMillis()}",
+                type = ElementType.APP_GRID,
+                title = appName,
+                style_props = StyleProps(x = vacantX, y = vacantY, w = 1, h = 1),
+                action_intent = ActionIntent(type = "launch_app", target = packageName)
+            )
+
+            elements.add(newElement)
+
+            val updatedPages = schema.pages.toMutableList().apply {
+                this[0] = firstPage.copy(elements = elements)
+            }
+
+            saveSchema(schema.copy(pages = updatedPages))
+            return true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
+    }
+
+    fun togglePinDock(packageName: String): Boolean {
+        try {
+            val schema = getSchema()
+            val dockApps = schema.dock.app_packages.toMutableList()
+            if (dockApps.contains(packageName)) {
+                dockApps.remove(packageName)
+            } else {
+                dockApps.add(packageName)
+            }
+            saveSchema(schema.copy(dock = schema.dock.copy(app_packages = dockApps)))
+            return true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
+    }
+
     fun resetSchema(): LauncherSchema {
         val schema = createDefaultSchema()
         saveSchema(schema)
@@ -343,6 +420,23 @@ class LauncherRepository(private val context: Context) {
             return true
         }
         return false
+    }
+
+    // ── Hidden Apps Storage ───────────────────────────────────────────────────
+    fun getHiddenApps(): Set<String> {
+        return prefs.getStringSet("hidden_packages", emptySet()) ?: emptySet()
+    }
+
+    fun hideApp(packageName: String) {
+        val current = getHiddenApps().toMutableSet()
+        current.add(packageName)
+        prefs.edit().putStringSet("hidden_packages", current).apply()
+    }
+
+    fun unhideApp(packageName: String) {
+        val current = getHiddenApps().toMutableSet()
+        current.remove(packageName)
+        prefs.edit().putStringSet("hidden_packages", current).apply()
     }
 
     // ── Notes persistence ───────────────────────────────────────────────────────

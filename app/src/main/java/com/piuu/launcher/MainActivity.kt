@@ -1,5 +1,6 @@
 package com.piuu.launcher
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
@@ -29,6 +30,7 @@ import com.piuu.launcher.repository.AiEngine
 import com.piuu.launcher.repository.LatencyManager
 import com.piuu.launcher.repository.LauncherRepository
 import com.piuu.launcher.repository.NotificationBridge
+import com.piuu.launcher.repository.FloatingOverlayService
 import com.piuu.launcher.ui.components.*
 import com.piuu.launcher.ui.theme.*
 import kotlinx.coroutines.launch
@@ -143,6 +145,8 @@ fun LauncherAppMain(
     // ── Launcher Core State ───────────────────────────────────────────────────
     var schema by remember { mutableStateOf(repository.getSchema()) }
     var apps by remember { mutableStateOf(repository.getApps()) }
+    var hiddenApps by remember { mutableStateOf(repository.getHiddenApps()) }
+    val visibleApps = remember(apps, hiddenApps) { apps.filter { it.package_name !in hiddenApps } }
     var notes by remember { mutableStateOf(repository.getNotes()) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefManager = remember { com.piuu.launcher.repository.LauncherPreferenceManager.getInstance(context) }
@@ -164,21 +168,8 @@ fun LauncherAppMain(
     val marketplaceCatalog = remember { repository.marketplaceCatalog }
     var metrics by remember { mutableStateOf(SystemMetrics()) }
 
-    // ── AI Chat Messages State ────────────────────────────────────────────────
-    val chatMessages = remember {
-        mutableStateListOf(
-            ChatMessage(
-                id = "m1",
-                sender = "ai",
-                text = "Hello! I am Piuu Neural Brain. How can I assist with your launcher layout, apps, or system metrics today?",
-                timestamp = "09:00 AM"
-            )
-        )
-    }
-
     // ── Overlay / Sheet States ────────────────────────────────────────────────
     var showDrawer by remember { mutableStateOf(false) }
-    var showBrainChat by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var showMarketplace by remember { mutableStateOf(false) }
     var showMetrics by remember { mutableStateOf(false) }
@@ -193,7 +184,6 @@ fun LauncherAppMain(
     LaunchedEffect(Unit) {
         onRegisterResetCallback?.invoke {
             showDrawer = false
-            showBrainChat = false
             showSearch = false
             showMarketplace = false
             showMetrics = false
@@ -206,7 +196,7 @@ fun LauncherAppMain(
     }
 
     // Back Button Handler: Close open sheets or do nothing (stay on home launcher)
-    val isAnyOverlayOpen = showDrawer || showBrainChat || showSearch || showMarketplace || showMetrics || showSchemaEditor || showWebView || showQuickSettings || (longPressedApp != null) || (longPressedElement != null)
+    val isAnyOverlayOpen = showDrawer || showSearch || showMarketplace || showMetrics || showSchemaEditor || showWebView || showQuickSettings || (longPressedApp != null) || (longPressedElement != null)
     BackHandler(enabled = isAnyOverlayOpen) {
         if (longPressedApp != null) {
             longPressedApp = null
@@ -214,7 +204,6 @@ fun LauncherAppMain(
             longPressedElement = null
         } else {
             showDrawer = false
-            showBrainChat = false
             showSearch = false
             showMarketplace = false
             showMetrics = false
@@ -231,7 +220,7 @@ fun LauncherAppMain(
 
         when (app.package_name) {
             "com.piuu.brain" -> {
-                showBrainChat = true
+                toggleFloatingOverlay(context)
             }
             "com.piuu.ide" -> {
                 showSchemaEditor = true
@@ -240,7 +229,7 @@ fun LauncherAppMain(
                 showMarketplace = true
             }
             "com.piuu.notes" -> {
-                showBrainChat = true
+                toggleFloatingOverlay(context)
             }
             else -> {
                 val launched = latencyManager.launchAppFast(context, app.package_name)
@@ -281,7 +270,7 @@ fun LauncherAppMain(
             HeaderBar(
                 metrics = metrics,
                 onOpenSearch = { showSearch = true },
-                onOpenBrainChat = { showBrainChat = true },
+                onOpenBrainChat = { toggleFloatingOverlay(context) },
                 onOpenMarketplace = { showMarketplace = true },
                 onOpenMetrics = { showMetrics = true },
                 onOpenSchemaEditor = { showSchemaEditor = true },
@@ -293,12 +282,12 @@ fun LauncherAppMain(
             HomeScreen(
                 schema = schema,
                 metrics = metrics,
-                installedApps = apps,
+                installedApps = visibleApps,
                 notes = notes,
                 onLaunchApp = handleLaunchApp,
                 onOpenDrawer = { showDrawer = true },
                 onOpenSearch = { showSearch = true },
-                onOpenBrainChat = { showBrainChat = true },
+                onOpenBrainChat = { toggleFloatingOverlay(context) },
                 onOpenQuickSettings = { showQuickSettings = true },
                 onOpenWebView = { showWebView = true },
                 onOpenMarketplace = { showMarketplace = true },
@@ -326,7 +315,7 @@ fun LauncherAppMain(
         // App Drawer
         AppDrawer(
             visible = showDrawer,
-            apps = apps,
+            apps = visibleApps,
             onDismiss = { showDrawer = false },
             onLaunchApp = { app ->
                 showDrawer = false
@@ -346,21 +335,6 @@ fun LauncherAppMain(
                 longPressedApp = app
             },
             onAutoCategorize = handleAutoCategorizeApps
-        )
-
-        // Brain AI Assistant Chat
-        BrainChatSheet(
-            visible = showBrainChat,
-            chatMessages = chatMessages,
-            onDismiss = { showBrainChat = false },
-            onSendMessage = { userText ->
-                val userMsg = ChatMessage("u_${System.currentTimeMillis()}", "user", userText, "Just now")
-                chatMessages.add(userMsg)
-                coroutineScope.launch {
-                    val aiResp = aiEngine.generateResponse(userText, "User active screen: Home Page")
-                    chatMessages.add(aiResp)
-                }
-            }
         )
 
         // Universal Search
@@ -474,6 +448,7 @@ fun LauncherAppMain(
                                 packName = item.payload
                             }
                         }
+                        prefManager.iconPackPackageName = packName
                         updatedSchema = schema.copy(active_icon_pack = packName)
                     }
                     else -> {
@@ -485,13 +460,16 @@ fun LauncherAppMain(
                     }
                 }
 
-                repository.installMarketplacePlugin(item)
-
-                schema = updatedSchema
-                repository.saveSchema(updatedSchema)
-                previewOriginalTheme = null
-                Toast.makeText(context, "Applied ${item.name} Scheme via SDK!", Toast.LENGTH_SHORT).show()
-                showMarketplace = false
+                val (success, msg) = repository.installMarketplacePlugin(item)
+                if (success) {
+                    schema = updatedSchema
+                    repository.saveSchema(updatedSchema)
+                    previewOriginalTheme = null
+                    Toast.makeText(context, "Applied '${item.name}' successfully!", Toast.LENGTH_SHORT).show()
+                    showMarketplace = false
+                } else {
+                    Toast.makeText(context, "Not able to apply '${item.name}': $msg", Toast.LENGTH_LONG).show()
+                }
             },
             onPreviewTheme = { item ->
                 if (previewOriginalTheme == null) {
@@ -611,7 +589,7 @@ fun LauncherAppMain(
                                 } else {
                                     when (packageName) {
                                         "com.piuu.brain" -> {
-                                            showBrainChat = true
+                                            toggleFloatingOverlay(context)
                                         }
                                         "com.piuu.ide" -> {
                                             showSchemaEditor = true
@@ -647,7 +625,7 @@ fun LauncherAppMain(
             onChangeWallpaper = {
                 val intent = Intent(Intent.ACTION_SET_WALLPAPER)
                 try {
-                    context.startActivity(Intent.createChooser(intent, "Choose Wallpaper Source"))
+                    context.startActivity(intent)
                 } catch (e: Exception) {
                     Toast.makeText(context, "No system wallpaper app found", Toast.LENGTH_SHORT).show()
                 }
@@ -713,6 +691,7 @@ fun LauncherAppMain(
             },
             onPrefChanged = {
                 apps = repository.getApps()
+                hiddenApps = repository.getHiddenApps()
             },
             allApps = apps
         )
@@ -809,5 +788,41 @@ fun LauncherAppMain(
             )
         }
     }
+}
+}
+
+fun isServiceRunning(context: Context, serviceClass: Class<*>): Boolean {
+    val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+    @Suppress("DEPRECATION")
+    for (service in manager.getRunningServices(Integer.MAX_VALUE)) {
+        if (serviceClass.name == service.service.className) {
+            return true
+        }
+    }
+    return false
+}
+
+fun toggleFloatingOverlay(context: Context) {
+    if (android.provider.Settings.canDrawOverlays(context)) {
+        if (isServiceRunning(context, FloatingOverlayService::class.java)) {
+            FloatingOverlayService.stop(context)
+            Toast.makeText(context, "Seamless PIP Floating Overlay Stopped", Toast.LENGTH_SHORT).show()
+        } else {
+            FloatingOverlayService.start(context)
+            Toast.makeText(context, "Seamless PIP Floating Overlay Started", Toast.LENGTH_SHORT).show()
+        }
+    } else {
+        val intent = android.content.Intent(
+            android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            android.net.Uri.parse("package:${context.packageName}")
+        )
+        try {
+            context.startActivity(intent)
+            Toast.makeText(context, "Please grant 'Draw over other apps' permission to start PIP", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            val genericIntent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+            context.startActivity(genericIntent)
+            Toast.makeText(context, "Please grant 'Draw over other apps' permission to start PIP", Toast.LENGTH_LONG).show()
+        }
     }
 }
