@@ -71,6 +71,18 @@ class LauncherPreferenceManager(context: Context) {
         get() = prefs.getBoolean(KEY_IS_DARK_MODE, true)
         set(value) = prefs.edit().putBoolean(KEY_IS_DARK_MODE, value).apply()
 
+    var wallpaperTransparency: Float
+        get() = prefs.getFloat(KEY_WALLPAPER_TRANSPARENCY, 1.0f)
+        set(value) = prefs.edit().putFloat(KEY_WALLPAPER_TRANSPARENCY, value).apply()
+
+    var appDrawerBlur: Int
+        get() = prefs.getInt(KEY_APP_DRAWER_BLUR, 15)
+        set(value) = prefs.edit().putInt(KEY_APP_DRAWER_BLUR, value).apply()
+
+    var appDrawerTransparency: Float
+        get() = prefs.getFloat(KEY_APP_DRAWER_TRANSPARENCY, 0.7f)
+        set(value) = prefs.edit().putFloat(KEY_APP_DRAWER_TRANSPARENCY, value).apply()
+
     companion object {
         private const val KEY_ICON_PACK_PACKAGE_NAME = "key_icon_pack_package_name"
         private const val KEY_GESTURE_SWIPE_UP = "key_gesture_swipe_up"
@@ -88,6 +100,9 @@ class LauncherPreferenceManager(context: Context) {
         private const val KEY_DRAWER_SHOW_FREQUENTLY_USED = "key_drawer_show_frequently_used"
         private const val KEY_DRAWER_SHOW_CATEGORIES = "key_drawer_show_categories"
         private const val KEY_IS_DARK_MODE = "key_is_dark_mode"
+        private const val KEY_WALLPAPER_TRANSPARENCY = "key_wallpaper_transparency"
+        private const val KEY_APP_DRAWER_BLUR = "key_app_drawer_blur"
+        private const val KEY_APP_DRAWER_TRANSPARENCY = "key_app_drawer_transparency"
 
         val GESTURE_ACTIONS = listOf(
             "DRAWER" to "Open App Drawer",

@@ -96,7 +96,7 @@ fun GlobalSearchModal(
                     item {
                         Text("Matching Apps", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
                     }
-                    items(appResults) { app ->
+                    items(appResults, key = { it.package_name }) { app ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -129,7 +129,7 @@ fun GlobalSearchModal(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("System Shortcuts & Actions", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
                     }
-                    items(mockSystemActions) { action ->
+                    items(mockSystemActions, key = { it.id }) { action ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

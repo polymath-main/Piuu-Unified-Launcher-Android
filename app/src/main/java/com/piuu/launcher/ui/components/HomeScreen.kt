@@ -435,6 +435,7 @@ fun HomeScreen(
                     // Render grid widget items with flexible span management
                     items(
                         items = page.elements,
+                        key = { it.element_id },
                         span = { elem ->
                             val defaultSpan = when (elem.type) {
                                 ElementType.CLOCK,

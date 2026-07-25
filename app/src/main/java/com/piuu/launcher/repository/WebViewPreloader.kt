@@ -112,7 +112,7 @@ object WebViewPreloader {
                 }
 
                 // Load initial layout assets
-                webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
+                webView.loadUrl("https://appassets.androidplatform.net/assets/public/index.html")
                 cachedWebView = webView
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to pre-warm WebView offscreen", e)

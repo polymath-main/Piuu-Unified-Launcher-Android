@@ -386,7 +386,7 @@ fun CreateFolderSection(app: SystemApp, allApps: List<SystemApp>, onFolderCreate
                 .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
                 .padding(4.dp)
         ) {
-            items(allApps) { item ->
+            items(allApps, key = { it.package_name }) { item ->
                 val isChecked = selectedApps.any { it.package_name == item.package_name }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

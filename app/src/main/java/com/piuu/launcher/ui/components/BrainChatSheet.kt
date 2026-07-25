@@ -87,7 +87,7 @@ fun BrainChatSheet(
 
             // Presets row
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(presetPrompts) { prompt ->
+                items(presetPrompts, key = { it }) { prompt ->
                     SuggestionChip(
                         onClick = { onSendMessage(prompt) },
                         label = { Text(prompt, fontSize = 11.sp, color = TextPrimary) },
@@ -114,7 +114,7 @@ fun BrainChatSheet(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 reverseLayout = false
             ) {
-                items(chatMessages) { message ->
+                items(chatMessages, key = { it.id }) { message ->
                     val isUser = message.sender == "user"
                     Row(
                         modifier = Modifier.fillMaxWidth(),

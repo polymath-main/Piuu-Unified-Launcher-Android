@@ -93,7 +93,7 @@ fun HybridWebViewComposable(
                     }
                 }
 
-                loadUrl("https://appassets.androidplatform.net/assets/index.html")
+                loadUrl("https://appassets.androidplatform.net/assets/public/index.html")
             }
 
             (targetWebView.parent as? ViewGroup)?.removeView(targetWebView)

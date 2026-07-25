@@ -95,7 +95,7 @@ fun MetricsDashboardModal(
                     Text("App Usage Frequency", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                 }
 
-                items(topAppsByUsage) { app ->
+                items(topAppsByUsage, key = { it.package_name }) { app ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

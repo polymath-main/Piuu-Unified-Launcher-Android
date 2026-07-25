@@ -1,5 +1,13 @@
 package com.piuu.launcher.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -483,16 +491,38 @@ fun MarketplaceCardItem(
     onPreview: (() -> Unit)? = null,
     onSdkTestAction: ((String) -> Unit)? = null
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isHovered) 1.03f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "scale"
+    )
+
+    var isExpanded by remember { mutableStateOf(false) }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = CardGlassBg),
         shape = RoundedCornerShape(18.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .graphicsLayer(
+                scaleX = scale,
+                scaleY = scale
+            )
+            .hoverable(interactionSource)
+            .testTag("marketplace_card_${item.id}")
             .border(
                 width = if (item.is_installed) 1.5.dp else 1.dp,
                 color = if (item.is_installed) SuccessGreen else LauncherBorder,
                 shape = RoundedCornerShape(18.dp)
             )
+            .clickable {
+                onPreview?.invoke()
+            }
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -535,9 +565,20 @@ fun MarketplaceCardItem(
                     )
                 }
 
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { isExpanded = !isExpanded }
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(item.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = "Toggle Details",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
                         if (item.preview_badge != null) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Surface(
@@ -554,7 +595,23 @@ fun MarketplaceCardItem(
                             }
                         }
                     }
-                    Text("${item.author} • ⭐ ${item.rating} (${item.downloads} downloads)", fontSize = 11.sp, color = TextMuted)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("${item.author} • ⭐ ${item.rating} ", fontSize = 11.sp, color = TextMuted)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Surface(
+                            color = if (item.is_installed) SuccessGreen.copy(alpha = 0.15f) else PrimaryBlue.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = if (item.is_installed) "Installed" else "Available",
+                                color = if (item.is_installed) SuccessGreen else PrimaryBlue,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
                 }
 
                 // Action Buttons Row
@@ -609,7 +666,67 @@ fun MarketplaceCardItem(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            Text(item.description, fontSize = 12.sp, color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+
+            if (isExpanded) {
+                // Parse schema metadata payload
+                var version = "1.0.0"
+                var fileSize = "128 KB"
+                var sdkReq = "v2.1"
+                if (!item.payload.isNullOrBlank()) {
+                    try {
+                        val json = JSONObject(item.payload)
+                        version = json.optString("version", json.optString("ver", "1.0.0"))
+                        fileSize = json.optString("file_size", json.optString("size", "128 KB"))
+                        sdkReq = json.optString("sdk_version", "v2.1")
+                    } catch (_: Exception) {}
+                }
+
+                Text(item.description, fontSize = 13.sp, color = TextSecondary, lineHeight = 18.sp)
+                
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = LauncherGlass),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text("SCHEMA METADATA", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Version", fontSize = 11.sp, color = TextMuted)
+                            Text(version, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        }
+                        Divider(modifier = Modifier.padding(vertical = 4.dp), color = LauncherBorder.copy(alpha = 0.5f))
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("File Size", fontSize = 11.sp, color = TextMuted)
+                            Text(fileSize, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        }
+                        Divider(modifier = Modifier.padding(vertical = 4.dp), color = LauncherBorder.copy(alpha = 0.5f))
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Category", fontSize = 11.sp, color = TextMuted)
+                            Text(item.category.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        }
+                        Divider(modifier = Modifier.padding(vertical = 4.dp), color = LauncherBorder.copy(alpha = 0.5f))
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Author", fontSize = 11.sp, color = TextMuted)
+                            Text(item.author, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        }
+                        Divider(modifier = Modifier.padding(vertical = 4.dp), color = LauncherBorder.copy(alpha = 0.5f))
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Required SDK", fontSize = 11.sp, color = TextMuted)
+                            Text(sdkReq, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        }
+                    }
+                }
+            } else {
+                Text(item.description, fontSize = 12.sp, color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 

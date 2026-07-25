@@ -484,7 +484,7 @@ fun PredictiveSuggestionsWidgetComposable(
             Text(text = if (!title.isNullOrBlank()) title else "Predictive Apps", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
             Spacer(modifier = Modifier.height(10.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(apps.take(5)) { app ->
+                items(apps.take(5), key = { it.package_name }) { app ->
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.clickable { onLaunchApp(app) }

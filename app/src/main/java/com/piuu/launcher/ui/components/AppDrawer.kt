@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -62,21 +63,33 @@ fun AppDrawer(
 
     val frequentApps = apps.sortedByDescending { it.usage_count }.take(5)
 
+    val appDrawerTransparency = prefManager.appDrawerTransparency
+    val appDrawerBlur = prefManager.appDrawerBlur
+
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = LauncherBackground
+            color = Color.Transparent
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 16.dp)
-            ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Background Layer with blur and transparency
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LauncherBackground.copy(alpha = appDrawerTransparency))
+                        .blur(appDrawerBlur.dp)
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                ) {
                 // Header Search Input & Close Button Row
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -168,7 +181,7 @@ fun AppDrawer(
                         )
                     }
 
-                    items(categories) { category ->
+                    items(categories, key = { it }) { category ->
                         val isSelected = category == selectedCategory
                         FilterChip(
                             selected = isSelected,
@@ -194,7 +207,7 @@ fun AppDrawer(
                 Text("Frequently Used", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    items(frequentApps) { app ->
+                    items(frequentApps, key = { it.package_name }) { app ->
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.combinedClickable(
@@ -250,7 +263,7 @@ fun AppDrawer(
                                 verticalArrangement = Arrangement.spacedBy(16.dp),
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                items(pageApps) { app ->
+                                items(pageApps, key = { it.package_name }) { app ->
                                     AppGridTileItem(
                                         app = app,
                                         onClick = { onLaunchApp(app) },
@@ -287,7 +300,7 @@ fun AppDrawer(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(filteredApps) { app ->
+                    items(filteredApps, key = { it.package_name }) { app ->
                         AppGridTileItem(
                             app = app,
                             onClick = { onLaunchApp(app) },
@@ -298,6 +311,7 @@ fun AppDrawer(
             }
         }
     }
+}
 }
 }
 

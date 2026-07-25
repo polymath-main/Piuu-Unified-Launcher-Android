@@ -255,7 +255,7 @@ fun SchemaEditorModal(
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(schemesList) { scheme ->
+                            items(schemesList, key = { it.id }) { scheme ->
                                 Card(
                                     colors = CardDefaults.cardColors(
                                         containerColor = if (selectedScheme?.id == scheme.id) CardGlassBg else Color.Transparent

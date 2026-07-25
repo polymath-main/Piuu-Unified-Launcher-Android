@@ -67,6 +67,7 @@ dependencies {
 
     // Utility & Data
     implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'androidx.datastore:datastore-preferences:1.0.0'
 
     // WebView & UI components
     implementation 'androidx.webkit:webkit:1.13.0-alpha01'
