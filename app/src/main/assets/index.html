@@ -1558,13 +1558,46 @@
         function applyThemeSchema(themeObj) {
             if (!themeObj) return;
             const root = document.documentElement;
-            if (themeObj.bg_color) root.style.setProperty('--bg-color', themeObj.bg_color);
-            if (themeObj.card_bg) root.style.setProperty('--card-bg', themeObj.card_bg);
-            if (themeObj.card_border) root.style.setProperty('--card-border', themeObj.card_border);
-            if (themeObj.text_primary) root.style.setProperty('--text-primary', themeObj.text_primary);
-            if (themeObj.text_secondary) root.style.setProperty('--text-secondary', themeObj.text_secondary);
-            if (themeObj.primary_blue) root.style.setProperty('--primary-blue', themeObj.primary_blue);
-            if (themeObj.accent_purple) root.style.setProperty('--accent-purple', themeObj.accent_purple);
+            const isDark = themeObj.is_dark !== false;
+
+            if (themeObj.bg_color) {
+                root.style.setProperty('--bg-color', themeObj.bg_color);
+            } else if (themeObj.bg_overlay) {
+                root.style.setProperty('--bg-color', themeObj.bg_overlay);
+            } else {
+                root.style.setProperty('--bg-color', isDark ? '#020817' : '#f8fafc');
+            }
+
+            if (themeObj.card_bg) {
+                root.style.setProperty('--card-bg', themeObj.card_bg);
+            } else {
+                root.style.setProperty('--card-bg', isDark ? 'rgba(30, 41, 59, 0.45)' : 'rgba(255, 255, 255, 0.88)');
+            }
+
+            if (themeObj.card_border) {
+                root.style.setProperty('--card-border', themeObj.card_border);
+            } else {
+                root.style.setProperty('--card-border', isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.12)');
+            }
+
+            if (themeObj.text_primary) {
+                root.style.setProperty('--text-primary', themeObj.text_primary);
+            } else {
+                root.style.setProperty('--text-primary', isDark ? '#f8fafc' : '#0f172a');
+            }
+
+            if (themeObj.text_secondary) {
+                root.style.setProperty('--text-secondary', themeObj.text_secondary);
+            } else {
+                root.style.setProperty('--text-secondary', isDark ? '#94a3b8' : '#475569');
+            }
+
+            if (themeObj.primary_blue || themeObj.primary_color) {
+                root.style.setProperty('--primary-blue', themeObj.primary_blue || themeObj.primary_color);
+            }
+            if (themeObj.accent_purple || themeObj.accent_color) {
+                root.style.setProperty('--accent-purple', themeObj.accent_purple || themeObj.accent_color);
+            }
             if (themeObj.glass_blur) root.style.setProperty('--glass-blur', themeObj.glass_blur);
             if (themeObj.icon_size) root.style.setProperty('--icon-size', themeObj.icon_size);
             if (themeObj.drawer_columns) {

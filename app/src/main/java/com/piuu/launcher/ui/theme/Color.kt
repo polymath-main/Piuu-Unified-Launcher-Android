@@ -6,14 +6,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 
 // Global theme state for dynamic updates across all legacy references
+var isDarkMode by mutableStateOf(true)
 var activePrimaryColor by mutableStateOf(Color(0xFF3B82F6))
 var activeAccentColor by mutableStateOf(Color(0xFF8B5CF6))
 var activeBgColor by mutableStateOf(Color(0xFF020817))
 
-val LauncherBackground: Color get() = activeBgColor
-val LauncherSurface: Color get() = activeBgColor.copy(alpha = 0.8f)
-val LauncherGlass = Color(0x1AFFFFFF)
-val LauncherBorder = Color(0x14FFFFFF)
+val LauncherBackground: Color get() = if (isDarkMode) activeBgColor else Color(0xFFF1F5F9)
+val LauncherSurface: Color get() = if (isDarkMode) activeBgColor.copy(alpha = 0.8f) else Color(0xFFFFFFFF)
+val LauncherGlass: Color get() = if (isDarkMode) Color(0x1AFFFFFF) else Color(0x1A000000)
+val LauncherBorder: Color get() = if (isDarkMode) Color(0x14FFFFFF) else Color(0x1F000000)
 
 val PrimaryBlue: Color get() = activePrimaryColor
 val AccentPurple: Color get() = activeAccentColor
@@ -21,12 +22,12 @@ val SuccessGreen = Color(0xFF10B981)
 val WarningAmber = Color(0xFFF59E0B)
 val DangerRed = Color(0xFFEF4444)
 
-val TextPrimary = Color(0xFFF8FAFC)
-val TextSecondary = Color(0xFF94A3B8)
-val TextMuted = Color(0xFF64748B)
+val TextPrimary: Color get() = if (isDarkMode) Color(0xFFF8FAFC) else Color(0xFF0F172A)
+val TextSecondary: Color get() = if (isDarkMode) Color(0xFF94A3B8) else Color(0xFF475569)
+val TextMuted: Color get() = if (isDarkMode) Color(0xFF64748B) else Color(0xFF94A3B8)
 
-val CardGlassBg = Color(0x261E293B)
-val CardBorder = Color(0x3338BDF8)
+val CardGlassBg: Color get() = if (isDarkMode) Color(0x261E293B) else Color(0xF2FFFFFF)
+val CardBorder: Color get() = if (isDarkMode) Color(0x3338BDF8) else Color(0x333B82F6)
 
 // Parsing utilities
 fun parseHexColor(hex: String, defaultColor: Color): Color {

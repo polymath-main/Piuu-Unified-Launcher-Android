@@ -43,6 +43,10 @@ class LauncherPreferenceManager(context: Context) {
         get() = prefs.getBoolean(KEY_DRAWER_SHOW_CATEGORIES, true)
         set(value) = prefs.edit().putBoolean(KEY_DRAWER_SHOW_CATEGORIES, value).apply()
 
+    var isDarkMode: Boolean
+        get() = prefs.getBoolean(KEY_IS_DARK_MODE, true)
+        set(value) = prefs.edit().putBoolean(KEY_IS_DARK_MODE, value).apply()
+
     companion object {
         private const val KEY_ICON_PACK_PACKAGE_NAME = "key_icon_pack_package_name"
         private const val KEY_GESTURE_SWIPE_UP = "key_gesture_swipe_up"
@@ -53,6 +57,7 @@ class LauncherPreferenceManager(context: Context) {
         private const val KEY_DRAWER_COLUMN_COUNT = "key_drawer_column_count"
         private const val KEY_DRAWER_SHOW_FREQUENTLY_USED = "key_drawer_show_frequently_used"
         private const val KEY_DRAWER_SHOW_CATEGORIES = "key_drawer_show_categories"
+        private const val KEY_IS_DARK_MODE = "key_is_dark_mode"
 
         val GESTURE_ACTIONS = listOf(
             "DRAWER" to "Open App Drawer",

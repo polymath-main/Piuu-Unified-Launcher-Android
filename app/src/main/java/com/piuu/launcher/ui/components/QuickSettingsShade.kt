@@ -41,7 +41,9 @@ fun QuickSettingsShade(
     onToggleBatterySaver: () -> Unit,
     onToggleDnd: () -> Unit,
     onClearNotifications: () -> Unit,
-    onScanApps: () -> Unit
+    onScanApps: () -> Unit,
+    isDarkMode: Boolean = true,
+    onToggleDarkMode: ((Boolean) -> Unit)? = null
 ) {
     if (!visible) return
 
@@ -145,6 +147,107 @@ fun QuickSettingsShade(
                     )
                     IconButton(onClick = onDismiss) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Display Theme Mode Card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, LauncherBorder, RoundedCornerShape(20.dp))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Display Theme Mode", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text(if (isDarkMode) "Dark Theme active" else "Light Theme active", fontSize = 11.sp, color = TextSecondary)
+                            }
+                            Icon(
+                                imageVector = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+                                contentDescription = null,
+                                tint = PrimaryBlue,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // Dark Mode Option
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isDarkMode) PrimaryBlue else CardGlassBg)
+                                    .border(1.dp, if (isDarkMode) PrimaryBlue else LauncherBorder, RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        onToggleDarkMode?.invoke(true)
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DarkMode,
+                                        contentDescription = null,
+                                        tint = if (isDarkMode) Color.White else TextPrimary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Dark Mode",
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isDarkMode) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isDarkMode) Color.White else TextPrimary
+                                    )
+                                }
+                            }
+
+                            // Light Mode Option
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (!isDarkMode) PrimaryBlue else CardGlassBg)
+                                    .border(1.dp, if (!isDarkMode) PrimaryBlue else LauncherBorder, RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        onToggleDarkMode?.invoke(false)
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.LightMode,
+                                        contentDescription = null,
+                                        tint = if (!isDarkMode) Color.White else TextPrimary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Light Mode",
+                                        fontSize = 12.sp,
+                                        fontWeight = if (!isDarkMode) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (!isDarkMode) Color.White else TextPrimary
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 

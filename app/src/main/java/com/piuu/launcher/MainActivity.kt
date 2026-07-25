@@ -86,10 +86,15 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            PiuuLauncherTheme {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val prefManager = remember { com.piuu.launcher.repository.LauncherPreferenceManager.getInstance(context) }
+            val isDark = prefManager.isDarkMode
+            com.piuu.launcher.ui.theme.isDarkMode = isDark
+
+            PiuuLauncherTheme(isDark = isDark) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = Color(0xFF020817)
+                    color = com.piuu.launcher.ui.theme.LauncherBackground
                 ) {
                     LauncherAppMain(
                         repository = repository,
@@ -133,6 +138,17 @@ fun LauncherAppMain(
     var apps by remember { mutableStateOf(repository.getApps()) }
     var notes by remember { mutableStateOf(repository.getNotes()) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val prefManager = remember { com.piuu.launcher.repository.LauncherPreferenceManager.getInstance(context) }
+    var isDarkModeState by remember { mutableStateOf(prefManager.isDarkMode) }
+
+    LaunchedEffect(schema.theme.is_dark) {
+        if (schema.theme.is_dark != isDarkModeState) {
+            isDarkModeState = schema.theme.is_dark
+            prefManager.isDarkMode = schema.theme.is_dark
+            com.piuu.launcher.ui.theme.isDarkMode = schema.theme.is_dark
+        }
+    }
+
     val configManager = remember { com.piuu.launcher.repository.LauncherConfigManager.getInstance(context) }
     var configState by remember { mutableStateOf(configManager.config) }
 
@@ -566,6 +582,16 @@ fun LauncherAppMain(
                 } else {
                     Toast.makeText(context, "No apps found, keeping defaults", Toast.LENGTH_SHORT).show()
                 }
+            },
+            isDarkMode = isDarkModeState,
+            onToggleDarkMode = { newIsDark ->
+                isDarkModeState = newIsDark
+                prefManager.isDarkMode = newIsDark
+                com.piuu.launcher.ui.theme.isDarkMode = newIsDark
+                val updatedTheme = schema.theme.copy(is_dark = newIsDark)
+                schema = schema.copy(theme = updatedTheme)
+                repository.saveSchema(schema)
+                Toast.makeText(context, if (newIsDark) "Switched to Dark Mode" else "Switched to Light Mode", Toast.LENGTH_SHORT).show()
             }
         )
     }
