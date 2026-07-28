@@ -211,7 +211,7 @@ fun LauncherAppMain(
         }
     }
 
-    // Launch App helper with LatencyManager ultra-low latency bridge
+    // Launch App helper with LatencyManager ultra-low latency bridge & fallback intent handling
     val handleLaunchApp: (SystemApp) -> Unit = { app ->
         repository.recordAppLaunch(app.package_name)
         apps = repository.getApps()
@@ -230,9 +230,11 @@ fun LauncherAppMain(
                 toggleFloatingOverlay(context)
             }
             else -> {
-                val launched = latencyManager.launchAppFast(context, app.package_name)
+                val launched = latencyManager.launchAppFast(context, app.package_name) {
+                    Toast.makeText(context, "${app.name} is not installed on this device", Toast.LENGTH_SHORT).show()
+                }
                 if (!launched) {
-                    Toast.makeText(context, "Opening ${app.name}...", Toast.LENGTH_SHORT).show()
+                    Log.w("MainActivity", "Could not launch package: ${app.package_name}")
                 }
             }
         }
