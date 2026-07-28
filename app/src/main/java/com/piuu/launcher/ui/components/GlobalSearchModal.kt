@@ -19,22 +19,41 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import com.piuu.launcher.model.SearchResultItem
 import com.piuu.launcher.model.SystemApp
 import com.piuu.launcher.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun GlobalSearchModal(
     visible: Boolean,
     apps: List<SystemApp>,
     onDismiss: () -> Unit,
-    onLaunchApp: (SystemApp) -> Unit
+    onLaunchApp: (SystemApp) -> Unit,
+    onSystemAction: (String) -> Unit
 ) {
     if (!visible) return
 
     var query by remember { mutableStateOf("") }
     var recentQueries by remember { mutableStateOf(listOf("Marketplace", "Brain", "WiFi", "Metrics")) }
+
+    val aiEngine = remember { com.piuu.launcher.repository.AiEngine() }
+    var aiSuggestedApps by remember { mutableStateOf<List<SystemApp>>(emptyList()) }
+    var isAiLoading by remember { mutableStateOf(false) }
+
+    LaunchedEffect(query) {
+        if (query.length > 2) {
+            isAiLoading = true
+            aiSuggestedApps = aiEngine.suggestAppsForSearch(query, apps)
+            isAiLoading = false
+        } else {
+            aiSuggestedApps = emptyList()
+            isAiLoading = false
+        }
+    }
 
     val updateRecentSearches: () -> Unit = {
         if (query.isNotBlank()) {
@@ -44,9 +63,10 @@ fun GlobalSearchModal(
         }
     }
 
-    val appResults = apps.filter { it.name.contains(query, ignoreCase = true) }.take(4)
+    val localResults = apps.filter { it.name.contains(query, ignoreCase = true) }
+    val appResults = (localResults + aiSuggestedApps).distinctBy { it.package_name }.take(8)
 
-    val mockSystemActions = listOf(
+    val systemActions = listOf(
         SearchResultItem("s1", "Toggle Wi-Fi Connection", "System Setting", "setting", "toggle_wifi", "wifi"),
         SearchResultItem("s2", "Open Marketplace Catalog", "Piuu Launcher", "setting", "open_marketplace", "shopping_bag"),
         SearchResultItem("s3", "View Live Metrics Dashboard", "Piuu Launcher", "setting", "open_metrics", "bar_chart"),
@@ -172,11 +192,23 @@ fun GlobalSearchModal(
 
                 if (appResults.isNotEmpty()) {
                     item {
-                        Text("Matching Apps", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Matching Apps", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                            if (isAiLoading) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                CircularProgressIndicator(modifier = Modifier.size(12.dp), color = PrimaryBlue, strokeWidth = 1.5.dp)
+                            }
+                        }
                     }
                     items(appResults, key = { it.package_name }) { app ->
                         Row(
                             modifier = Modifier
+                                .animateItemPlacement(
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessLow
+                                    )
+                                )
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(CardGlassBg)
@@ -206,12 +238,12 @@ fun GlobalSearchModal(
                     }
                 }
 
-                if (mockSystemActions.isNotEmpty()) {
+                if (systemActions.isNotEmpty()) {
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("System Shortcuts & Actions", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
                     }
-                    items(mockSystemActions, key = { it.id }) { action ->
+                    items(systemActions, key = { it.id }) { action ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -219,6 +251,7 @@ fun GlobalSearchModal(
                                 .background(CardGlassBg)
                                 .clickable {
                                     updateRecentSearches()
+                                    onSystemAction(action.target)
                                     onDismiss()
                                 }
                                 .padding(12.dp),

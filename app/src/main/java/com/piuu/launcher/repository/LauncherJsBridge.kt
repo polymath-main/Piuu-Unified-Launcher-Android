@@ -297,6 +297,21 @@ class LauncherJsBridge(
         return bitmap
     }
 
+    @JavascriptInterface
+    fun suggestAppsForSearch(query: String): String {
+        return try {
+            val apps = repository.getApps()
+            var packages = listOf<String>()
+            kotlinx.coroutines.runBlocking {
+                val results = AiEngine().suggestAppsForSearch(query, apps)
+                packages = results.map { it.package_name }
+            }
+            gson.toJson(packages)
+        } catch (e: Exception) {
+            "[]"
+        }
+    }
+
     // ── Marketplace Core & SDK Bridge API ───────────────────────────────────────
     @JavascriptInterface
     fun getMarketplaceCatalog(): String {

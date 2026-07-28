@@ -9,7 +9,14 @@ import android.os.Build
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.piuu.launcher.database.AppUsageEntity
+import com.piuu.launcher.database.DockShortcutEntity
+import com.piuu.launcher.database.HomeWidgetEntity
+import com.piuu.launcher.database.PiuuLauncherDatabase
 import com.piuu.launcher.model.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -18,6 +25,8 @@ class LauncherRepository(private val context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("piuu_launcher_prefs", Context.MODE_PRIVATE)
     private val gson = Gson()
+    private val db = PiuuLauncherDatabase.getInstance(context)
+    private val repositoryScope = CoroutineScope(Dispatchers.IO)
 
     // ── Default Apps Database ───────────────────────────────────────────────────
     val defaultApps = listOf(
@@ -104,6 +113,40 @@ class LauncherRepository(private val context: Context) {
 
     fun saveSchema(schema: LauncherSchema) {
         prefs.edit().putString("launcher_schema", gson.toJson(schema)).apply()
+        
+        // Persist Home Widgets and Dock Shortcuts into SQLite Room Database
+        repositoryScope.launch {
+            try {
+                val widgetEntities = mutableListOf<HomeWidgetEntity>()
+                schema.pages.forEachIndexed { pageIdx, page ->
+                    page.elements.forEach { elem ->
+                        widgetEntities.add(
+                            HomeWidgetEntity(
+                                elementId = elem.element_id,
+                                type = elem.type.name,
+                                pageIndex = pageIdx,
+                                x = elem.style_props.x ?: 0,
+                                y = elem.style_props.y ?: 0,
+                                w = elem.style_props.w ?: 1,
+                                h = elem.style_props.h ?: 1,
+                                title = elem.title ?: "",
+                                propsJson = gson.toJson(elem.style_props)
+                            )
+                        )
+                    }
+                }
+                db.launcherDao().clearAllWidgets()
+                db.launcherDao().insertAllWidgets(widgetEntities)
+
+                val dockEntities = schema.dock.app_packages.mapIndexed { idx, pkg ->
+                    DockShortcutEntity(packageName = pkg, position = idx)
+                }
+                db.launcherDao().clearDockShortcuts()
+                db.launcherDao().setDockShortcuts(dockEntities)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     fun addShortcutToHome(packageName: String, appName: String): Boolean {
@@ -356,6 +399,23 @@ class LauncherRepository(private val context: Context) {
 
     fun saveApps(apps: List<SystemApp>) {
         prefs.edit().putString("installed_apps", gson.toJson(apps)).apply()
+
+        // Sync app usage stats and favorite flags into SQLite Room Database
+        repositoryScope.launch {
+            try {
+                val usageEntities = apps.map {
+                    AppUsageEntity(
+                        packageName = it.package_name,
+                        appName = it.name,
+                        usageCount = it.usage_count,
+                        isFavorite = it.is_favorite
+                    )
+                }
+                db.launcherDao().insertAllAppUsage(usageEntities)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     fun reorderApps(packageNames: List<String>): Boolean {

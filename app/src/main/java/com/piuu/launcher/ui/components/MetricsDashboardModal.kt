@@ -32,6 +32,8 @@ fun MetricsDashboardModal(
     if (!visible) return
 
     val topAppsByUsage = apps.sortedByDescending { it.usage_count }.take(6)
+    val totalLaunches = apps.sumOf { it.usage_count }
+    val maxUsage = apps.maxOfOrNull { it.usage_count }?.coerceAtLeast(1) ?: 1
 
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
@@ -83,8 +85,8 @@ fun MetricsDashboardModal(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Launches: 342 times", fontSize = 12.sp, color = SuccessGreen)
-                                Text("Pickups: 48 times", fontSize = 12.sp, color = PrimaryBlue)
+                                Text("Launches: $totalLaunches times", fontSize = 12.sp, color = SuccessGreen)
+                                Text("Active Apps: ${apps.filter { it.usage_count > 0 }.size}", fontSize = 12.sp, color = PrimaryBlue)
                             }
                         }
                     }
@@ -118,7 +120,7 @@ fun MetricsDashboardModal(
                             Text(app.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                             Spacer(modifier = Modifier.height(4.dp))
                             LinearProgressIndicator(
-                                progress = (app.usage_count / 350f).coerceIn(0.1f, 1f),
+                                progress = (app.usage_count.toFloat() / maxUsage.toFloat()).coerceIn(0.1f, 1f),
                                 color = PrimaryBlue,
                                 trackColor = Color(0x22FFFFFF),
                                 modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp))

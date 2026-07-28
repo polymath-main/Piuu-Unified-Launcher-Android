@@ -176,7 +176,7 @@ class AiEngine {
         return callGeminiRaw(fullPrompt, apiKey)
     }
 
-    private fun callGeminiRaw(fullPrompt: String, apiKey: String, modelName: String = "gemini-1.5-flash"): String {
+    private fun callGeminiRaw(fullPrompt: String, apiKey: String, modelName: String = "gemini-3.5-flash"): String {
         val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey")
         val conn = url.openConnection() as HttpURLConnection
         conn.requestMethod = "POST"
@@ -221,6 +221,28 @@ class AiEngine {
     /**
      * AI-driven app categorization: Uses LLM-based tagging with automatic offline local clustering fallback.
      */
+    suspend fun suggestAppsForSearch(query: String, apps: List<com.piuu.launcher.model.SystemApp>): List<com.piuu.launcher.model.SystemApp> = withContext(Dispatchers.IO) {
+        if (query.isBlank()) return@withContext emptyList()
+        val apiKey = getApiKey()
+        if (apiKey.isBlank()) return@withContext emptyList()
+        try {
+            val appDetails = apps.joinToString(separator = "\n") { "- Package: ${it.package_name}, Name: ${it.name}" }
+            val prompt = """
+                User searched for: "$query".
+                Select up to 4 most relevant apps from this list based on the search intent (e.g. "social" -> messaging apps, "web" -> browsers).
+                Return ONLY a comma-separated list of package names. No other text or explanation.
+                Apps:
+                $appDetails
+            """.trimIndent()
+            val resp = callGeminiRaw(prompt, apiKey, "gemini-3.5-flash")
+            val packages = resp.split(",").map { it.trim().removeSurrounding("\"") }
+            return@withContext apps.filter { packages.contains(it.package_name) }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return@withContext emptyList()
+    }
+
     suspend fun categorizeApps(
         apps: List<com.piuu.launcher.model.SystemApp>
     ): List<Pair<String, String>> = withContext(Dispatchers.IO) {

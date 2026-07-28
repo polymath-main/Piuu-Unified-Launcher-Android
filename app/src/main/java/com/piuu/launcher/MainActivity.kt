@@ -345,6 +345,14 @@ fun LauncherAppMain(
             onLaunchApp = { app ->
                 showSearch = false
                 handleLaunchApp(app)
+            },
+            onSystemAction = { actionTarget ->
+                when (actionTarget) {
+                    "toggle_wifi" -> metrics = metrics.copy(wifi_enabled = !metrics.wifi_enabled)
+                    "open_marketplace" -> showMarketplace = true
+                    "open_metrics" -> showMetrics = true
+                    "open_schema" -> showSchemaEditor = true
+                }
             }
         )
 

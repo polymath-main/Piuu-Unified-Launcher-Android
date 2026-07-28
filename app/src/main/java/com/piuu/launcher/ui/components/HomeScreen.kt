@@ -25,6 +25,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.*
@@ -239,111 +241,173 @@ fun HomeScreen(
             }
         }
 
-        // Homescreen Long-Press Options Dialog
+        // Homescreen Long-Press Unified Context Hub Options Dialog
         if (showHomescreenOptions) {
+            val wallpaperHandler = remember { com.piuu.launcher.repository.WallpaperHandler(context) }
+            val iconPackManager = remember { com.piuu.launcher.repository.IconPackManager(context) }
+            val repository = remember { com.piuu.launcher.repository.LauncherRepository(context) }
+
             Dialog(onDismissRequest = { showHomescreenOptions = false }) {
                 Surface(
                     shape = RoundedCornerShape(24.dp),
-                    color = com.piuu.launcher.ui.theme.CardGlassBg.copy(alpha = 0.95f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder),
+                    color = com.piuu.launcher.ui.theme.CardGlassBg.copy(alpha = 0.98f),
+                    border = androidx.compose.foundation.BorderStroke(1.2.dp, LauncherBorder),
                     modifier = Modifier.padding(16.dp).fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(24.dp),
+                        modifier = Modifier
+                            .padding(20.dp)
+                            .verticalScroll(rememberScrollState()),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Piuu Context Hub",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            IconButton(onClick = { showHomescreenOptions = false }) {
+                                Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
+                            }
+                        }
+
                         Text(
-                            text = "Home Options",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                        Text(
-                            text = "Configure layouts, choose system wallpapers, and adjust system-wide settings.",
-                            fontSize = 12.sp,
+                            text = "Access system widgets, AI assistant, wallpaper colors, icon packs, and home grid controls.",
+                            fontSize = 11.sp,
                             color = TextSecondary,
                             textAlign = TextAlign.Center
                         )
 
-                        // Option 1: Choose System Wallpaper
-                        Button(
-                            onClick = {
-                                showHomescreenOptions = false
-                                val intent = android.content.Intent(android.content.Intent.ACTION_SET_WALLPAPER)
-                                try {
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    android.widget.Toast.makeText(context, "No system wallpaper app found", android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.Wallpaper, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Set System Wallpaper", fontWeight = FontWeight.Bold)
-                        }
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                        // Option 2: Quick Settings
-                        Button(
-                            onClick = {
-                                showHomescreenOptions = false
-                                onOpenQuickSettings()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x1AFFFFFF)),
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.Settings, contentDescription = null, tint = TextPrimary)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Launcher Preferences", color = TextPrimary, fontWeight = FontWeight.Bold)
-                        }
-
-                        // Option 3: Drag & Sizing Mode (Directly on Homescreen)
-                        Button(
-                            onClick = {
-                                showHomescreenOptions = false
-                                val firstElemId = pages.firstOrNull()?.elements?.firstOrNull()?.element_id
-                                if (firstElemId != null) {
-                                    activeResizingElementId = firstElemId
-                                } else {
-                                    Toast.makeText(context, "No widgets found to edit. Please add a widget first.", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x1AFFFFFF)),
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.Edit, contentDescription = null, tint = TextPrimary)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Edit Layout (Drag & Sizing)", color = TextPrimary, fontWeight = FontWeight.Bold)
-                        }
-
-                        // Option 4: Add Widget (Open Widgets Dashboard)
+                        // 1. System Widget Picker
                         Button(
                             onClick = {
                                 showHomescreenOptions = false
                                 showWidgetsDashboard = true
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x1AFFFFFF)),
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(14.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = TextPrimary)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Add Widget", color = TextPrimary, fontWeight = FontWeight.Bold)
+                            Icon(imageVector = Icons.Default.Widgets, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("System Widget Picker", fontWeight = FontWeight.Bold)
                         }
 
-                        OutlinedButton(
-                            onClick = { showHomescreenOptions = false },
+                        // 2. Gemini AI Assistant Launch
+                        Button(
+                            onClick = {
+                                showHomescreenOptions = false
+                                onOpenBrainChat()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentPurple),
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Launch Piuu Brain AI", fontWeight = FontWeight.Bold)
+                        }
+
+                        // 3. App Drawer Navigation
+                        Button(
+                            onClick = {
+                                showHomescreenOptions = false
+                                onOpenDrawer()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CardGlassBg),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder)
                         ) {
-                            Text("Dismiss", color = TextPrimary)
+                            Icon(imageVector = Icons.Default.Apps, contentDescription = null, tint = TextPrimary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Open App Drawer", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        // 4. Wallpaper Dynamic Palette Extraction
+                        Button(
+                            onClick = {
+                                showHomescreenOptions = false
+                                val palette = wallpaperHandler.extractWallpaperPalette()
+                                val updatedTheme = schema.theme.copy(
+                                    primary_color = palette.primaryHex,
+                                    accent_color = palette.vibrantHex,
+                                    bg_overlay = palette.bgOverlayHex
+                                )
+                                onSaveSchema(schema.copy(theme = updatedTheme))
+                                Toast.makeText(context, "Harmonized dynamic colors from wallpaper palette!", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CardGlassBg),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder)
+                        ) {
+                            Icon(imageVector = Icons.Default.Palette, contentDescription = null, tint = PrimaryBlue)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Extract Wallpaper Dynamic Theme", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        // 5. Custom Icon Pack Scanner
+                        Button(
+                            onClick = {
+                                showHomescreenOptions = false
+                                val packs = iconPackManager.getInstalledIconPacks()
+                                if (packs.isNotEmpty()) {
+                                    Toast.makeText(context, "Detected ${packs.size} custom icon pack(s): ${packs.first().name}", Toast.LENGTH_LONG).show()
+                                } else {
+                                    Toast.makeText(context, "Scanning completed: System dynamic adaptors active.", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CardGlassBg),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder)
+                        ) {
+                            Icon(imageVector = Icons.Default.Brush, contentDescription = null, tint = AccentPurple)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Scan Custom Icon Packs", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        // 6. Home Grid Layout Reset
+                        Button(
+                            onClick = {
+                                showHomescreenOptions = false
+                                val defaultSchema = repository.resetSchema()
+                                onSaveSchema(defaultSchema)
+                                Toast.makeText(context, "Home grid layout reset to default!", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CardGlassBg),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, DangerRed.copy(alpha = 0.5f))
+                        ) {
+                            Icon(imageVector = Icons.Default.RestartAlt, contentDescription = null, tint = DangerRed)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Reset Home Grid Layout", color = DangerRed, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        // 7. Launcher Preferences
+                        Button(
+                            onClick = {
+                                showHomescreenOptions = false
+                                onOpenQuickSettings()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CardGlassBg),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder)
+                        ) {
+                            Icon(imageVector = Icons.Default.Settings, contentDescription = null, tint = TextPrimary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Launcher Preferences", color = TextPrimary, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }

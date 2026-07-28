@@ -256,6 +256,7 @@
             border-radius: 14px;
             transition: background-color 0.2s ease, transform 0.1s ease;
             will-change: transform;
+            animation: springIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
         .app-item:active {
@@ -362,6 +363,12 @@
             background: rgba(30, 41, 59, 0.5);
         }
 
+        @keyframes springIn {
+            0% { transform: scale(0.9) translateY(10px); opacity: 0; }
+            70% { transform: scale(1.05) translateY(-2px); opacity: 1; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
         .hidden {
             display: none !important;
         }
@@ -370,6 +377,7 @@
             opacity: 0.4 !important;
             background: rgba(139, 92, 246, 0.25) !important;
             border: 1px dashed #a78bfa !important;
+            transform: scale(0.95) !important;
         }
 
         /* High-performance Flutter-smooth spring curves and transitions */
@@ -1079,7 +1087,7 @@
             showToast("App Drawer configuration saved successfully!");
         }
 
-        function renderAll(apps) {
+        function renderAll(apps, skipFilter = false) {
             // Update total apps count
             document.getElementById('app-count').innerText = apps.length;
 
@@ -1087,7 +1095,7 @@
             const query = searchInput ? searchInput.value.toLowerCase() : "";
 
             // Filter apps based on query
-            const filteredApps = apps.filter(app => 
+            const filteredApps = skipFilter ? apps : apps.filter(app => 
                 app.name.toLowerCase().includes(query) || 
                 app.package_name.toLowerCase().includes(query)
             );
@@ -1223,8 +1231,39 @@
             return item;
         }
 
-        function filterApps() {
-            renderAll(allApps);
+        let searchTimeout = null;
+        async function filterApps() {
+            renderAll(allApps); // Fallback synchronous first
+
+            const searchInput = document.getElementById('search-input');
+            const query = searchInput ? searchInput.value.trim() : "";
+            
+            if (query.length > 2 && window.AndroidLauncherBridge && window.AndroidLauncherBridge.suggestAppsForSearch) {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(async () => {
+                    try {
+                        const jsonRes = window.AndroidLauncherBridge.suggestAppsForSearch(query);
+                        const suggestedPackages = JSON.parse(jsonRes);
+                        if (suggestedPackages && suggestedPackages.length > 0) {
+                            // Boost AI suggested apps to the top, and still include textual matches
+                            const textualMatches = allApps.filter(app => 
+                                app.name.toLowerCase().includes(query.toLowerCase()) || 
+                                app.package_name.toLowerCase().includes(query.toLowerCase())
+                            );
+                            
+                            const aiApps = allApps.filter(app => suggestedPackages.includes(app.package_name));
+                            
+                            // Combine and deduplicate
+                            const combined = [...aiApps, ...textualMatches].filter((v, i, a) => a.findIndex(t => (t.package_name === v.package_name)) === i);
+                            
+                            // Re-render with combined sorted apps
+                            renderAll(combined, true); 
+                        }
+                    } catch(e) {
+                        console.error("AI Search Error:", e);
+                    }
+                }, 400); // Debounce AI call
+            }
         }
 
         // --- Notification Center Pipeline ---
@@ -1542,11 +1581,31 @@
                 schemes.forEach(scheme => {
                     const card = document.createElement('div');
                     card.className = 'marketplace-card';
+                    
+                    let previewHtml = '';
+                    if (activeMarketplaceCategory === 'themes' && scheme.payload) {
+                        try {
+                            const themeObj = JSON.parse(scheme.payload);
+                            const pCol = themeObj.primary_blue || themeObj.primary_color || '#3b82f6';
+                            const aCol = themeObj.accent_purple || themeObj.accent_color || '#8b5cf6';
+                            const bCol = themeObj.bg_color || themeObj.card_bg || '#020817';
+                            
+                            previewHtml = `
+                                <div style="display: flex; gap: 6px; margin-top: 8px;">
+                                    <div style="width: 14px; height: 14px; border-radius: 50%; background-color: ${pCol};"></div>
+                                    <div style="width: 14px; height: 14px; border-radius: 50%; background-color: ${aCol};"></div>
+                                    <div style="width: 14px; height: 14px; border-radius: 50%; background-color: ${bCol}; border: 1px solid rgba(255,255,255,0.2);"></div>
+                                </div>
+                            `;
+                        } catch(e) {}
+                    }
+                    
                     card.innerHTML = `
                         <div style="display: flex; flex-direction: column; gap: 4px;">
                             <div class="marketplace-title">${scheme.name}</div>
                             <div class="marketplace-author">By ${scheme.author}</div>
                             <div class="marketplace-desc">${scheme.description}</div>
+                            ${previewHtml}
                         </div>
                         <button class="marketplace-btn" onclick="applySchemeById('${scheme.id}', event)">Apply</button>
                     `;

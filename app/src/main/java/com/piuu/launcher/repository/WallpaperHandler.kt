@@ -136,6 +136,67 @@ class WallpaperHandler(private val context: Context) {
         }
     }
 
+    /**
+     * Data holder for wallpaper extracted dynamic palette colors.
+     */
+    data class WallpaperPalette(
+        val primaryHex: String = "#3B82F6",
+        val vibrantHex: String = "#8B5CF6",
+        val accentHex: String = "#38BDF8",
+        val bgOverlayHex: String = "rgba(2, 8, 23, 0.85)"
+    )
+
+    /**
+     * Automatically extracts primary and vibrant color accents from active system wallpaper to harmonize the launcher UI.
+     */
+    fun extractWallpaperPalette(): WallpaperPalette {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                val colors = wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                if (colors != null) {
+                    val p = colors.primaryColor.toArgb()
+                    val s = colors.secondaryColor?.toArgb() ?: p
+                    val t = colors.tertiaryColor?.toArgb() ?: s
+
+                    fun intToHex(colorInt: Int): String {
+                        return String.format("#%06X", 0xFFFFFF and colorInt)
+                    }
+
+                    return WallpaperPalette(
+                        primaryHex = intToHex(p),
+                        vibrantHex = intToHex(s),
+                        accentHex = intToHex(t),
+                        bgOverlayHex = "rgba(10, 15, 30, 0.85)"
+                    )
+                }
+            }
+
+            // Bitmap Fallback Pixel Sampling
+            val bitmap = getWallpaperBitmap()
+            if (bitmap != null) {
+                val w = bitmap.width
+                val h = bitmap.height
+                val p1 = bitmap.getPixel((w * 0.3).toInt().coerceIn(0, w - 1), (h * 0.3).toInt().coerceIn(0, h - 1))
+                val p2 = bitmap.getPixel((w * 0.7).toInt().coerceIn(0, w - 1), (h * 0.5).toInt().coerceIn(0, h - 1))
+                val p3 = bitmap.getPixel((w * 0.5).toInt().coerceIn(0, w - 1), (h * 0.8).toInt().coerceIn(0, h - 1))
+
+                fun intToHex(colorInt: Int): String {
+                    return String.format("#%06X", 0xFFFFFF and colorInt)
+                }
+
+                return WallpaperPalette(
+                    primaryHex = intToHex(p1),
+                    vibrantHex = intToHex(p2),
+                    accentHex = intToHex(p3),
+                    bgOverlayHex = "rgba(10, 15, 30, 0.85)"
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error extracting wallpaper palette", e)
+        }
+        return WallpaperPalette()
+    }
+
     companion object {
         private const val TAG = "WallpaperHandler"
     }
