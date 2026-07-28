@@ -148,18 +148,18 @@ fun SchemaEditorModal(
                 Tab(
                     selected = activeTab == 0,
                     onClick = { activeTab = 0 },
-                    text = { Text("Declarative IDE", fontWeight = FontWeight.Bold) }
+                    text = { Text("Scheme Customizer", fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = activeTab == 1,
                     onClick = { activeTab = 1 },
-                    text = { Text("SchemeStore Customizer", fontWeight = FontWeight.Bold) }
+                    text = { Text("Advanced JSON IDE", fontWeight = FontWeight.Bold) }
                 )
             }
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            if (activeTab == 0) {
+            if (activeTab == 1) {
                 // Declarative JSON IDE View
                 Text("Live Declarative JSON Launcher Schema", fontSize = 12.sp, color = TextMuted)
                 Spacer(modifier = Modifier.height(8.dp))

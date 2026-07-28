@@ -57,13 +57,20 @@ fun MarketplaceModal(
     val marketplaceCore = remember { MarketplaceCore.getInstance(context) }
     val installedPlugins by marketplaceCore.installedPluginsFlow.collectAsState()
 
+    var showDeveloperTools by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf("all") }
     var searchQuery by remember { mutableStateOf("") }
     var aiPrompt by remember { mutableStateOf("") }
     var isGeneratingAiTheme by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    val tabs = listOf("all", "theming", "fonts", "layouts", "faces", "widgets", "icons", "agents", "skills", "sdk_sandbox")
+    val tabs = remember(showDeveloperTools) {
+        if (showDeveloperTools) {
+            listOf("all", "theming", "fonts", "layouts", "faces", "widgets", "icons", "agents", "skills", "sdk_sandbox")
+        } else {
+            listOf("all", "theming", "fonts", "layouts", "widgets", "icons", "agents")
+        }
+    }
 
     var customManifestJson by remember {
         mutableStateOf("""{
@@ -112,12 +119,27 @@ fun MarketplaceModal(
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 // Header Bar
+                var titleClickCount by remember { mutableStateOf(0) }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable {
+                            titleClickCount++
+                            if (titleClickCount >= 5) {
+                                showDeveloperTools = !showDeveloperTools
+                                titleClickCount = 0
+                                android.widget.Toast.makeText(
+                                    context,
+                                    if (showDeveloperTools) "Developer Mode Activated 🛠️" else "Standard Mode Activated 🌸",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(38.dp)
@@ -130,16 +152,22 @@ fun MarketplaceModal(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Piuu Marketplace", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Surface(
-                                    color = SuccessGreen.copy(alpha = 0.2f),
-                                    shape = RoundedCornerShape(6.dp)
-                                ) {
-                                    Text("CORE SDK v2.1", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = SuccessGreen, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                Text("Piuu Design Store", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                if (showDeveloperTools) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Surface(
+                                        color = SuccessGreen.copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text("DEV CORE v2.1", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = SuccessGreen, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                    }
                                 }
                             }
-                            Text("Extensible Schemes, Themes, Widgets & Custom Plugins", fontSize = 11.sp, color = TextMuted)
+                            Text(
+                                text = if (showDeveloperTools) "Sandbox, Telemetries & Custom SDK Plugins active" else "Beautiful Theme Packs, Custom Fonts & Widgets",
+                                fontSize = 11.sp,
+                                color = TextMuted
+                            )
                         }
                     }
                     IconButton(onClick = onDismiss) {
@@ -149,43 +177,76 @@ fun MarketplaceModal(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Marketplace Core Engine Telemetry Bar
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = CardGlassBg),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, LauncherBorder, RoundedCornerShape(14.dp))
-                ) {
-                    Row(
+                if (showDeveloperTools) {
+                    // Marketplace Core Engine Telemetry Bar
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .border(1.dp, LauncherBorder, RoundedCornerShape(14.dp))
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Column {
-                                Text("Catalog Items", fontSize = 10.sp, color = TextMuted)
-                                Text("${catalog.size}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Column {
+                                    Text("Catalog Items", fontSize = 10.sp, color = TextMuted)
+                                    Text("${catalog.size}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                                }
+                                Column {
+                                    Text("Active Plugins", fontSize = 10.sp, color = TextMuted)
+                                    Text("${installedPlugins.count { it.isInstalled }}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SuccessGreen)
+                                }
+                                Column {
+                                    Text("SDK Sandbox", fontSize = 10.sp, color = TextMuted)
+                                    Text("Isolated", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AccentPurple)
+                                }
                             }
-                            Column {
-                                Text("Active Plugins", fontSize = 10.sp, color = TextMuted)
-                                Text("${installedPlugins.count { it.isInstalled }}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SuccessGreen)
-                            }
-                            Column {
-                                Text("SDK Sandbox", fontSize = 10.sp, color = TextMuted)
-                                Text("Isolated", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AccentPurple)
+
+                            TextButton(
+                                onClick = { selectedTab = "sdk_sandbox" },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.Code, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("SDK Dev Hub", fontSize = 11.sp, color = PrimaryBlue, fontWeight = FontWeight.Bold)
                             }
                         }
-
-                        TextButton(
-                            onClick = { selectedTab = "sdk_sandbox" },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    }
+                } else {
+                    // Friendly User Banner (Minimal visual concept!)
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, LauncherBorder.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(Icons.Default.Code, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("SDK Dev Hub", fontSize = 11.sp, color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(AccentPurple.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, tint = AccentPurple, modifier = Modifier.size(18.dp))
+                            }
+                            Column {
+                                Text("Aesthetic Home customizers", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text("Tap on any card to preview, or apply instantly to beautify your home screen.", fontSize = 11.sp, color = TextSecondary)
+                            }
                         }
                     }
                 }
@@ -532,13 +593,13 @@ fun MarketplaceCardItem(
                 // Category Icon Badge
                 val badgeGradient = remember(item.category, activePrimaryColor, activeAccentColor) {
                     when (item.category.lowercase()) {
-                        "theming", "themes" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activePrimaryColor, activeAccentColor))
-                        "fonts" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activeAccentColor, Color(0xFFC084FC)))
-                        "layouts" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(SuccessGreen, Color(0xFF34D399)))
-                        "faces", "widgets" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(WarningAmber, Color(0xFFFBBF24)))
-                        "icons" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activePrimaryColor, Color(0xFF60A5FA)))
-                        "agents" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activeAccentColor, Color(0xFFF472B6)))
-                        else -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activePrimaryColor, SuccessGreen))
+                        "theming", "themes" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activePrimaryColor, activePrimaryColor.copy(alpha = 0.5f)))
+                        "fonts" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activeAccentColor, activeAccentColor.copy(alpha = 0.5f)))
+                        "layouts" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(SuccessGreen, SuccessGreen.copy(alpha = 0.5f)))
+                        "faces", "widgets" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(WarningAmber, WarningAmber.copy(alpha = 0.5f)))
+                        "icons" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activePrimaryColor, activePrimaryColor.copy(alpha = 0.5f)))
+                        "agents" -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activeAccentColor, activeAccentColor.copy(alpha = 0.5f)))
+                        else -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(activePrimaryColor, activePrimaryColor.copy(alpha = 0.5f)))
                     }
                 }
                 Box(
@@ -666,7 +727,60 @@ fun MarketplaceCardItem(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Dynamic Color Swatches Preview for Themes
+            if ((item.category.lowercase().contains("theme") || item.category.lowercase().contains("theming")) && !item.payload.isNullOrBlank()) {
+                var primaryHex = "#3B82F6"
+                var accentHex = "#8B5CF6"
+                var bgHex = "#020817"
+                var hasPalette = false
+                try {
+                    val json = JSONObject(item.payload)
+                    primaryHex = json.optString("primary_blue", json.optString("primary_color", ""))
+                    accentHex = json.optString("accent_purple", json.optString("accent_color", ""))
+                    bgHex = json.optString("bg_color", json.optString("bg_overlay", ""))
+                    if (primaryHex.isNotBlank() || accentHex.isNotBlank()) {
+                        hasPalette = true
+                    }
+                } catch (_: Exception) {}
+
+                if (hasPalette) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        Text("Colors:", fontSize = 11.sp, color = TextMuted, fontWeight = FontWeight.Bold)
+                        val pCol = try { Color(android.graphics.Color.parseColor(primaryHex)) } catch (_: Exception) { PrimaryBlue }
+                        val aCol = try { Color(android.graphics.Color.parseColor(accentHex)) } catch (_: Exception) { AccentPurple }
+                        val bCol = try { Color(android.graphics.Color.parseColor(bgHex)) } catch (_: Exception) { Color(0xFF020817) }
+
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(pCol)
+                                .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(aCol)
+                                .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(bCol)
+                                .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
 
             if (isExpanded) {
                 // Parse schema metadata payload
