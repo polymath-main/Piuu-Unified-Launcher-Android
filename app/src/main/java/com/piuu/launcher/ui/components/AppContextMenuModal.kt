@@ -31,6 +31,8 @@ import com.piuu.launcher.model.SystemApp
 import com.piuu.launcher.repository.LauncherConfig
 import com.piuu.launcher.repository.LauncherConfigManager
 import com.piuu.launcher.repository.LauncherPreferenceManager
+import com.piuu.launcher.repository.AppIconImage
+import com.piuu.launcher.repository.LauncherRepository
 import com.piuu.launcher.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,7 +85,7 @@ fun AppContextMenuModal(
                             .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        com.piuu.launcher.repository.AppIconImage(
+                        AppIconImage(
                             packageName = app.package_name,
                             modifier = Modifier.size(28.dp),
                             fallbackIconName = app.icon_name,
@@ -303,7 +305,7 @@ fun AppInfoSection(
             }
         }
 
-        val repository = remember { com.piuu.launcher.repository.LauncherRepository(context) }
+        val repository = remember { LauncherRepository(context) }
         val isCurrentlyHidden = remember(app) { repository.getHiddenApps().contains(app.package_name) }
         val isPinnedToDock = remember(app) { repository.getSchema().dock.app_packages.contains(app.package_name) }
 

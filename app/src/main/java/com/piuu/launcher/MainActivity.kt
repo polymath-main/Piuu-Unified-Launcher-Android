@@ -33,6 +33,9 @@ import com.piuu.launcher.repository.NotificationBridge
 import com.piuu.launcher.repository.FloatingOverlayService
 import com.piuu.launcher.ui.components.*
 import com.piuu.launcher.ui.theme.*
+import com.piuu.launcher.repository.WallpaperHandler
+import com.piuu.launcher.repository.LauncherPreferenceManager
+import com.piuu.launcher.repository.LauncherConfigManager
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -42,8 +45,6 @@ class MainActivity : ComponentActivity() {
     private val latencyManager = LatencyManager.getInstance()
     private var resetUiStateCallback: (() -> Unit)? = null
 
-    @androidx.webkit.WebViewCompat.ExperimentalAsyncStartUp
-    @android.annotation.SuppressLint("WrongConstant")
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -63,47 +64,45 @@ class MainActivity : ComponentActivity() {
 
         repository = LauncherRepository(applicationContext)
 
+        // Register dynamic WallpaperColors listener to extract primary/secondary colors from the system wallpaper and apply dynamically
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            val wallpaperManager = android.app.WallpaperManager.getInstance(applicationContext)
+            val wallpaperHandler = WallpaperHandler(applicationContext)
+            val listener = android.app.WallpaperManager.OnColorsChangedListener { colors, which ->
+                if (which and android.app.WallpaperManager.FLAG_SYSTEM != 0) {
+                    val palette = wallpaperHandler.extractWallpaperPalette()
+                    val currentSchema = repository.getSchema()
+                    val updatedTheme = currentSchema.theme.copy(
+                        primary_color = palette.primaryHex,
+                        accent_color = palette.vibrantHex,
+                        bg_overlay = palette.bgOverlayHex
+                    )
+                    repository.saveSchema(currentSchema.copy(theme = updatedTheme))
+                    runOnUiThread {
+                        resetUiStateCallback?.invoke()
+                    }
+                }
+            }
+            try {
+                wallpaperManager.addOnColorsChangedListener(listener, android.os.Handler(android.os.Looper.getMainLooper()))
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
         // Pre-warm app launch intents asynchronously for ultra-low launch latency
         latencyManager.prewarmAppIntents(this, repository.getApps().map { it.package_name })
 
-        // 1. WebKit/Chromium Startup Workload Offloading using startUpWebView API
-        try {
-            if (androidx.webkit.WebViewFeature.isFeatureSupported("START_UP_WEBVIEW")) {
-                val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
-                val config = androidx.webkit.WebViewStartUpConfig.Builder(executor).build()
-                androidx.webkit.WebViewCompat.startUpWebView(
-                    config,
-                    object : androidx.webkit.WebViewCompat.WebViewStartUpCallback {
-                        override fun onSuccess(result: androidx.webkit.WebViewStartUpResult) {
-                            android.util.Log.d("PiuuStartup", "WebViewCompat startUpWebView initialized successfully in background thread.")
-                        }
-                    }
-                )
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("PiuuStartup", "Exception in startUpWebView", e)
-        }
-
-        // 2. Offscreen WebView Warm-up Preloader initialization to achieve "instant" in-browser feel
-        val startupScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main)
-        com.piuu.launcher.repository.WebViewPreloader.prewarm(
-            applicationContext,
-            repository,
-            latencyManager,
-            aiEngine,
-            startupScope
-        )
-
         setContent {
             val context = androidx.compose.ui.platform.LocalContext.current
-            val prefManager = remember { com.piuu.launcher.repository.LauncherPreferenceManager.getInstance(context) }
+            val prefManager = remember { LauncherPreferenceManager.getInstance(context) }
             val isDark = prefManager.isDarkMode
-            com.piuu.launcher.ui.theme.isDarkMode = isDark
+            isDarkMode = isDark
 
             PiuuLauncherTheme(isDark = isDark) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = com.piuu.launcher.ui.theme.LauncherBackground
+                    color = LauncherBackground
                 ) {
                     LauncherAppMain(
                         repository = repository,
@@ -128,7 +127,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        com.piuu.launcher.repository.WebViewPreloader.destroy()
     }
 }
 
@@ -149,18 +147,18 @@ fun LauncherAppMain(
     val visibleApps = remember(apps, hiddenApps) { apps.filter { it.package_name !in hiddenApps } }
     var notes by remember { mutableStateOf(repository.getNotes()) }
     val context = androidx.compose.ui.platform.LocalContext.current
-    val prefManager = remember { com.piuu.launcher.repository.LauncherPreferenceManager.getInstance(context) }
+    val prefManager = remember { LauncherPreferenceManager.getInstance(context) }
     var isDarkModeState by remember { mutableStateOf(prefManager.isDarkMode) }
 
     LaunchedEffect(schema.theme.is_dark) {
         if (schema.theme.is_dark != isDarkModeState) {
             isDarkModeState = schema.theme.is_dark
             prefManager.isDarkMode = schema.theme.is_dark
-            com.piuu.launcher.ui.theme.isDarkMode = schema.theme.is_dark
+            isDarkMode = schema.theme.is_dark
         }
     }
 
-    val configManager = remember { com.piuu.launcher.repository.LauncherConfigManager.getInstance(context) }
+    val configManager = remember { LauncherConfigManager.getInstance(context) }
     var configState by remember { mutableStateOf(configManager.config) }
 
     val notificationBridge = remember { NotificationBridge.getInstance(context) }
@@ -529,7 +527,7 @@ fun LauncherAppMain(
                     font_family = font
                 )
                 schema = schema.copy(theme = previewTheme)
-                Toast.makeText(context, context.getString(com.piuu.launcher.R.string.toast_preview_applied), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_preview_applied), Toast.LENGTH_SHORT).show()
             }
         )
 
@@ -560,61 +558,25 @@ fun LauncherAppMain(
             }
         )
 
-        // Hybrid WebView Drawer Sheet
+        // Native Control Dashboard Sheet
         if (showWebView) {
             androidx.compose.ui.window.Dialog(
                 onDismissRequest = { showWebView = false },
                 properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
             ) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = Color(0xFF020817)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .statusBarsPadding()
-                            .navigationBarsPadding()
-                            .padding(horizontal = 16.dp, vertical = 16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            IconButton(onClick = { showWebView = false }) {
-                                Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        HybridWebViewComposable(
-                            repository = repository,
-                            latencyManager = latencyManager,
-                            aiEngine = aiEngine,
-                            onLaunchApp = { packageName, appName ->
-                                val app = apps.firstOrNull { it.package_name == packageName }
-                                if (app != null) {
-                                    handleLaunchApp(app)
-                                } else {
-                                    when (packageName) {
-                                        "com.piuu.brain" -> {
-                                            toggleFloatingOverlay(context)
-                                        }
-                                        "com.piuu.ide" -> {
-                                            showSchemaEditor = true
-                                        }
-                                        "com.piuu.suite" -> {
-                                            showMarketplace = true
-                                        }
-                                        else -> {
-                                            latencyManager.launchAppFast(context, packageName)
-                                        }
-                                    }
-                                }
-                                showWebView = false
-                            }
-                        )
-                    }
-                }
+                NativeControlDashboard(
+                    repository = repository,
+                    latencyManager = latencyManager,
+                    aiEngine = aiEngine,
+                    schema = schema,
+                    onSaveSchema = { updatedSchema ->
+                        schema = updatedSchema
+                        repository.saveSchema(updatedSchema)
+                    },
+                    onDismiss = { showWebView = false },
+                    onOpenMarketplace = { showMarketplace = true },
+                    onOpenSchemaEditor = { showSchemaEditor = true }
+                )
             }
         }
 
@@ -670,7 +632,7 @@ fun LauncherAppMain(
             onToggleDarkMode = { newIsDark ->
                 isDarkModeState = newIsDark
                 prefManager.isDarkMode = newIsDark
-                com.piuu.launcher.ui.theme.isDarkMode = newIsDark
+                isDarkMode = newIsDark
                 val updatedTheme = schema.theme.copy(is_dark = newIsDark)
                 schema = schema.copy(theme = updatedTheme)
                 repository.saveSchema(schema)

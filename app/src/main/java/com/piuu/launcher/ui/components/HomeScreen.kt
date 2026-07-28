@@ -44,6 +44,9 @@ import androidx.compose.ui.unit.sp
 import com.piuu.launcher.model.*
 import com.piuu.launcher.repository.LauncherPreferenceManager
 import com.piuu.launcher.repository.NotificationBridge
+import com.piuu.launcher.repository.WallpaperHandler
+import com.piuu.launcher.repository.IconPackManager
+import com.piuu.launcher.repository.LauncherRepository
 import com.piuu.launcher.ui.theme.*
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -243,14 +246,14 @@ fun HomeScreen(
 
         // Homescreen Long-Press Unified Context Hub Options Dialog
         if (showHomescreenOptions) {
-            val wallpaperHandler = remember { com.piuu.launcher.repository.WallpaperHandler(context) }
-            val iconPackManager = remember { com.piuu.launcher.repository.IconPackManager(context) }
-            val repository = remember { com.piuu.launcher.repository.LauncherRepository(context) }
+            val wallpaperHandler = remember { WallpaperHandler(context) }
+            val iconPackManager = remember { IconPackManager(context) }
+            val repository = remember { LauncherRepository(context) }
 
             Dialog(onDismissRequest = { showHomescreenOptions = false }) {
                 Surface(
                     shape = RoundedCornerShape(24.dp),
-                    color = com.piuu.launcher.ui.theme.CardGlassBg.copy(alpha = 0.98f),
+                    color = CardGlassBg.copy(alpha = 0.98f),
                     border = androidx.compose.foundation.BorderStroke(1.2.dp, LauncherBorder),
                     modifier = Modifier.padding(16.dp).fillMaxWidth()
                 ) {
@@ -419,7 +422,7 @@ fun HomeScreen(
             Dialog(onDismissRequest = { showWidgetsDashboard = false }) {
                 Surface(
                     shape = RoundedCornerShape(24.dp),
-                    color = com.piuu.launcher.ui.theme.CardGlassBg.copy(alpha = 0.95f),
+                    color = CardGlassBg.copy(alpha = 0.95f),
                     border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder),
                     modifier = Modifier
                         .padding(16.dp)
@@ -864,7 +867,14 @@ fun HomeScreen(
                                                                 )
                                                             }
                                                             Spacer(modifier = Modifier.height(4.dp))
-                                                            Text(app.name, fontSize = 11.sp, color = TextSecondary)
+                                                            Text(
+                                                                text = app.name,
+                                                                fontSize = 11.sp,
+                                                                fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                                                                lineHeight = 16.sp,
+                                                                letterSpacing = 0.5.sp,
+                                                                color = TextSecondary
+                                                            )
                                                         }
                                                     }
                                                 }

@@ -99,16 +99,77 @@ class LauncherRepository(private val context: Context) {
     // ── Get / Save Schema ───────────────────────────────────────────────────────
     fun getSchema(): LauncherSchema {
         val json = prefs.getString("launcher_schema", null)
-        if (json != null) {
+        var schema = if (json != null) {
             try {
-                return gson.fromJson(json, LauncherSchema::class.java)
+                gson.fromJson(json, LauncherSchema::class.java)
             } catch (e: Exception) {
                 e.printStackTrace()
+                val defaultSchema = createDefaultSchema()
+                saveSchema(defaultSchema)
+                defaultSchema
             }
+        } else {
+            val defaultSchema = createDefaultSchema()
+            saveSchema(defaultSchema)
+            defaultSchema
         }
-        val defaultSchema = createDefaultSchema()
-        saveSchema(defaultSchema)
-        return defaultSchema
+
+        // Synchronize Home Screen page widgets/icons grid layouts and dock shortcuts from SQLite Room database
+        try {
+            val widgetList = kotlinx.coroutines.runBlocking {
+                db.launcherDao().getAllWidgetsSync()
+            }
+            val dockShortcuts = kotlinx.coroutines.runBlocking {
+                db.launcherDao().getDockShortcutsSync()
+            }
+
+            if (widgetList.isNotEmpty() || dockShortcuts.isNotEmpty()) {
+                // Reconstruct pages based on SQLite Room DB positions
+                val pages = schema.pages.mapIndexed { pageIdx, page ->
+                    val pageWidgets = widgetList.filter { it.pageIndex == pageIdx }
+                    if (pageWidgets.isNotEmpty()) {
+                        val elements = pageWidgets.map { entity ->
+                            val styleProps = try {
+                                gson.fromJson(entity.propsJson, StyleProps::class.java)
+                            } catch (_: Exception) {
+                                StyleProps(
+                                    x = entity.x,
+                                    y = entity.y,
+                                    w = entity.w,
+                                    h = entity.h
+                                )
+                            }.copy(
+                                x = entity.x,
+                                y = entity.y,
+                                w = entity.w,
+                                h = entity.h
+                            )
+                            LauncherElement(
+                                element_id = entity.elementId,
+                                type = ElementType.valueOf(entity.type),
+                                title = entity.title,
+                                style_props = styleProps
+                            )
+                        }
+                        page.copy(elements = elements)
+                    } else {
+                        page
+                    }
+                }
+
+                val dock = if (dockShortcuts.isNotEmpty()) {
+                    schema.dock.copy(app_packages = dockShortcuts.map { it.packageName })
+                } else {
+                    schema.dock
+                }
+
+                schema = schema.copy(pages = pages, dock = dock)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return schema
     }
 
     fun saveSchema(schema: LauncherSchema) {
@@ -235,23 +296,49 @@ class LauncherRepository(private val context: Context) {
     // ── Get / Save Apps ─────────────────────────────────────────────────────────
     fun getApps(): List<SystemApp> {
         val json = prefs.getString("installed_apps", null)
-        if (json != null) {
+        var list = if (json != null) {
             try {
                 val type = object : TypeToken<List<SystemApp>>() {}.type
-                return gson.fromJson(json, type)
+                gson.fromJson<List<SystemApp>>(json, type)
             } catch (e: Exception) {
                 e.printStackTrace()
+                emptyList()
+            }
+        } else {
+            // Scan and import real device applications on first-run startup
+            val scanned = scanAndSaveInstalledApps(context)
+            if (scanned.isNotEmpty()) {
+                scanned
+            } else {
+                saveApps(defaultApps)
+                defaultApps
             }
         }
-        
-        // Scan and import real device applications on first-run startup
-        val scanned = scanAndSaveInstalledApps(context)
-        if (scanned.isNotEmpty()) {
-            return scanned
+
+        // Synchronize with SQLite Room Database for app usage frequency and favorites
+        try {
+            val usageList = kotlinx.coroutines.runBlocking {
+                db.launcherDao().getAllAppUsageSync()
+            }
+            if (usageList.isNotEmpty()) {
+                val usageMap = usageList.associateBy { it.packageName }
+                list = list.map { app ->
+                    val usage = usageMap[app.package_name]
+                    if (usage != null) {
+                        app.copy(
+                            usage_count = usage.usageCount,
+                            is_favorite = usage.isFavorite
+                        )
+                    } else {
+                        app
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        
-        saveApps(defaultApps)
-        return defaultApps
+
+        return list
     }
 
     fun scanAndSaveInstalledApps(ctx: Context): List<SystemApp> {

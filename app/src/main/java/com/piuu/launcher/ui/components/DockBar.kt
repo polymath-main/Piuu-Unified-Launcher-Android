@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.piuu.launcher.model.SystemApp
 import com.piuu.launcher.ui.theme.*
+import com.piuu.launcher.repository.LauncherPreferenceManager
+import com.piuu.launcher.repository.AppIconImage
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -54,7 +56,7 @@ fun DockBar(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val context = androidx.compose.ui.platform.LocalContext.current
-        val prefManager = remember { com.piuu.launcher.repository.LauncherPreferenceManager.getInstance(context) }
+        val prefManager = remember { LauncherPreferenceManager.getInstance(context) }
         val dockIconSize = prefManager.dockIconSize
 
         // Swipe Up Handle Indicator
@@ -132,7 +134,7 @@ fun DockIconItem(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                com.piuu.launcher.repository.AppIconImage(
+                AppIconImage(
                     packageName = app.package_name,
                     modifier = Modifier.size((iconSize * 0.46f).dp),
                     fallbackIconName = app.icon_name,
@@ -146,6 +148,9 @@ fun DockIconItem(
                 text = app.name,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                lineHeight = 14.sp,
+                letterSpacing = 0.5.sp,
                 color = TextPrimary,
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,

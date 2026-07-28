@@ -30,6 +30,9 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import com.piuu.launcher.model.SystemApp
 import com.piuu.launcher.ui.theme.*
+import com.piuu.launcher.repository.LauncherPreferenceManager
+import com.piuu.launcher.repository.LauncherConfigManager
+import com.piuu.launcher.repository.AppIconImage
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -42,11 +45,9 @@ fun AppDrawer(
     onLongPressApp: (SystemApp) -> Unit,
     onAutoCategorize: (() -> Unit) -> Unit = {}
 ) {
-    if (!visible) return
-
     val context = androidx.compose.ui.platform.LocalContext.current
-    val prefManager = remember { com.piuu.launcher.repository.LauncherPreferenceManager.getInstance(context) }
-    val configManager = remember { com.piuu.launcher.repository.LauncherConfigManager.getInstance(context) }
+    val prefManager = remember { LauncherPreferenceManager.getInstance(context) }
+    val configManager = remember { LauncherConfigManager.getInstance(context) }
     val showFrequentlyUsed = prefManager.drawerShowFrequentlyUsed
     val showCategories = prefManager.drawerShowCategories
     val columnCount = prefManager.drawerColumnCount
@@ -64,7 +65,7 @@ fun AppDrawer(
         matchesQuery && matchesCategory
     }
 
-    val frequentApps = apps.sortedByDescending { it.usage_count }.take(5)
+    val frequentApps = apps.sortedByDescending { it.usage_count }.take(4)
 
     // Reactive preference state triggers
     var prefVersion by remember { mutableIntStateOf(0) }
@@ -76,10 +77,27 @@ fun AppDrawer(
         com.piuu.launcher.ui.theme.parseRgbaOrHexColor(prefManager.drawerBackgroundColor, LauncherBackground)
     }
 
-    androidx.compose.ui.window.Dialog(
-        onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        enter = androidx.compose.animation.slideInVertically(
+            initialOffsetY = { it },
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
+                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+            )
+        ) + androidx.compose.animation.fadeIn(),
+        exit = androidx.compose.animation.slideOutVertically(
+            targetOffsetY = { it },
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+            )
+        ) + androidx.compose.animation.fadeOut()
     ) {
+        androidx.activity.compose.BackHandler(enabled = visible) {
+            onDismiss()
+        }
+
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = Color.Transparent
@@ -87,7 +105,11 @@ fun AppDrawer(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.45f)),
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) { onDismiss() },
                 contentAlignment = Alignment.Center
             ) {
                 // Background Customizable Card Container with alpha and border styling
@@ -102,6 +124,7 @@ fun AppDrawer(
                             color = LauncherBorder.copy(alpha = (safeAlpha + 0.2f).coerceAtMost(1.0f)),
                             shape = RoundedCornerShape(24.dp)
                         )
+                        .clickable(enabled = true, onClick = {})
                 ) {
                     Column(
                         modifier = Modifier
@@ -224,7 +247,7 @@ fun AppDrawer(
 
             // Frequently Used Row (if no search query)
             if (showFrequentlyUsed && searchQuery.isEmpty() && selectedCategory == "all") {
-                Text("Frequently Used", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                Text("Smart Usage", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     items(frequentApps, key = { it.package_name }) { app ->
@@ -242,7 +265,7 @@ fun AppDrawer(
                                     .background(AccentPurple.copy(alpha = 0.25f)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                com.piuu.launcher.repository.AppIconImage(
+                                AppIconImage(
                                     packageName = app.package_name,
                                     modifier = Modifier.size((drawerIconSize * 0.46f).dp),
                                     fallbackIconName = app.icon_name,
@@ -254,6 +277,9 @@ fun AppDrawer(
                                 Text(
                                     text = app.name,
                                     fontSize = 11.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                                    lineHeight = 16.sp,
+                                    letterSpacing = 0.5.sp,
                                     color = TextPrimary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -380,7 +406,7 @@ fun AppGridTileItem(
                     .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                com.piuu.launcher.repository.AppIconImage(
+                AppIconImage(
                     packageName = app.package_name,
                     modifier = Modifier.size((iconSize * 0.48f).dp),
                     fallbackIconName = app.icon_name,
@@ -394,6 +420,9 @@ fun AppGridTileItem(
                 text = app.name,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                lineHeight = 16.sp,
+                letterSpacing = 0.5.sp,
                 color = TextPrimary,
                 textAlign = TextAlign.Center,
                 maxLines = 1,

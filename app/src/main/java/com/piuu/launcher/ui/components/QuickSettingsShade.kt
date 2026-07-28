@@ -24,6 +24,10 @@ import androidx.compose.ui.unit.sp
 import com.piuu.launcher.model.NotificationItem
 import com.piuu.launcher.model.SystemMetrics
 import com.piuu.launcher.ui.theme.*
+import com.piuu.launcher.repository.LauncherPreferenceManager
+import com.piuu.launcher.repository.FloatingOverlayService
+import com.piuu.launcher.isServiceRunning
+import com.piuu.launcher.toggleFloatingOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,7 +93,7 @@ fun QuickSettingsShade(
         )
     }
 
-    val prefManager = remember { com.piuu.launcher.repository.LauncherPreferenceManager.getInstance(context) }
+    val prefManager = remember { LauncherPreferenceManager.getInstance(context) }
     var gestureSwipeUp by remember { mutableStateOf(prefManager.gestureSwipeUp) }
     var gestureSwipeDown by remember { mutableStateOf(prefManager.gestureSwipeDown) }
     var gestureDoubleTap by remember { mutableStateOf(prefManager.gestureDoubleTap) }
@@ -369,7 +373,7 @@ fun QuickSettingsShade(
 
                         val context = androidx.compose.ui.platform.LocalContext.current
                         var isOverlayActive by remember {
-                            mutableStateOf(com.piuu.launcher.isServiceRunning(context, com.piuu.launcher.repository.FloatingOverlayService::class.java))
+                            mutableStateOf(isServiceRunning(context, FloatingOverlayService::class.java))
                         }
                         val canDrawOver = remember { android.provider.Settings.canDrawOverlays(context) }
 
@@ -390,8 +394,8 @@ fun QuickSettingsShade(
                             Switch(
                                 checked = isOverlayActive,
                                 onCheckedChange = {
-                                    com.piuu.launcher.toggleFloatingOverlay(context)
-                                    isOverlayActive = com.piuu.launcher.isServiceRunning(context, com.piuu.launcher.repository.FloatingOverlayService::class.java)
+                                    toggleFloatingOverlay(context)
+                                    isOverlayActive = isServiceRunning(context, FloatingOverlayService::class.java)
                                 },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = PrimaryBlue,
@@ -404,7 +408,7 @@ fun QuickSettingsShade(
                             Spacer(modifier = Modifier.height(10.dp))
                             Button(
                                 onClick = {
-                                    com.piuu.launcher.toggleFloatingOverlay(context)
+                                    toggleFloatingOverlay(context)
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = WarningAmber),
                                 shape = RoundedCornerShape(12.dp),
@@ -719,7 +723,7 @@ fun QuickSettingsShade(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 colorPresets.forEach { (hex, name) ->
-                                    val parsed = com.piuu.launcher.ui.theme.parseRgbaOrHexColor(hex, PrimaryBlue)
+                                    val parsed = parseRgbaOrHexColor(hex, PrimaryBlue)
                                     val isSel = drawerBgHex == hex
                                     Box(
                                         modifier = Modifier
@@ -1215,7 +1219,7 @@ fun GestureRowSetting(
     onActionSelected: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val currentLabel = com.piuu.launcher.repository.LauncherPreferenceManager.GESTURE_ACTIONS.find { it.first == currentAction }?.second ?: currentAction
+    val currentLabel = LauncherPreferenceManager.GESTURE_ACTIONS.find { it.first == currentAction }?.second ?: currentAction
 
     Row(
         modifier = Modifier
@@ -1275,7 +1279,7 @@ fun GestureRowSetting(
                 onDismissRequest = { expanded = false },
                 modifier = Modifier.background(Color(0xFF1E293B))
             ) {
-                com.piuu.launcher.repository.LauncherPreferenceManager.GESTURE_ACTIONS.forEach { (actionKey, actionLabel) ->
+                LauncherPreferenceManager.GESTURE_ACTIONS.forEach { (actionKey, actionLabel) ->
                     DropdownMenuItem(
                         text = {
                             Text(

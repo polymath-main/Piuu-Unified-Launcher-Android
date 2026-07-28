@@ -217,6 +217,17 @@ fun AppIcon(
     val repository = remember { LauncherRepository(context) }
     val schema = repository.getSchema()
     val activeIconPack = schema.active_icon_pack.lowercase()
+    val prefManager = remember { LauncherPreferenceManager.getInstance(context) }
+    
+    val chosenShape = remember(prefManager.adaptiveIconShape) {
+        when (prefManager.adaptiveIconShape.uppercase()) {
+            "CIRCLE" -> androidx.compose.foundation.shape.CircleShape
+            "SQUIRCLE" -> androidx.compose.foundation.shape.RoundedCornerShape(32)
+            "TEARDROP" -> androidx.compose.foundation.shape.RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 4.dp)
+            "ROUNDED_RECT" -> androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            else -> androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+        }
+    }
     
     val iconBitmapState = androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(
         initialValue = null, 
@@ -246,7 +257,7 @@ fun AppIcon(
             activeIconPack.contains("pixel") -> androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
             activeIconPack.contains("pastel") -> androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
             activeIconPack.contains("monochrome") || activeIconPack.contains("neon") || activeIconPack.contains("gold") -> androidx.compose.foundation.shape.CircleShape
-            else -> shape
+            else -> chosenShape
         }
 
         val packModifier = modifier
@@ -359,7 +370,7 @@ fun AppIcon(
             androidx.compose.foundation.Image(
                 bitmap = bitmap,
                 contentDescription = null,
-                modifier = modifier.clip(shape)
+                modifier = modifier.clip(chosenShape)
             )
         } else {
             androidx.compose.material3.Icon(

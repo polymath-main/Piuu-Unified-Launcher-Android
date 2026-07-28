@@ -25,6 +25,7 @@ import androidx.compose.animation.core.Spring
 import com.piuu.launcher.model.SearchResultItem
 import com.piuu.launcher.model.SystemApp
 import com.piuu.launcher.ui.theme.*
+import com.piuu.launcher.repository.AiEngine
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -40,7 +41,7 @@ fun GlobalSearchModal(
     var query by remember { mutableStateOf("") }
     var recentQueries by remember { mutableStateOf(listOf("Marketplace", "Brain", "WiFi", "Metrics")) }
 
-    val aiEngine = remember { com.piuu.launcher.repository.AiEngine() }
+    val aiEngine = remember { AiEngine() }
     var aiSuggestedApps by remember { mutableStateOf<List<SystemApp>>(emptyList()) }
     var isAiLoading by remember { mutableStateOf(false) }
 

@@ -83,6 +83,10 @@ class LauncherPreferenceManager(context: Context) {
         get() = prefs.getFloat(KEY_APP_DRAWER_TRANSPARENCY, 0.7f)
         set(value) = prefs.edit().putFloat(KEY_APP_DRAWER_TRANSPARENCY, value).apply()
 
+    var adaptiveIconShape: String
+        get() = prefs.getString("key_adaptive_icon_shape", "ROUNDED_RECT") ?: "ROUNDED_RECT"
+        set(value) = prefs.edit().putString("key_adaptive_icon_shape", value).apply()
+
     var drawerBackgroundColor: String
         get() = prefs.getString(KEY_DRAWER_BG_COLOR, "#020817") ?: "#020817"
         set(value) = prefs.edit().putString(KEY_DRAWER_BG_COLOR, value).apply()
