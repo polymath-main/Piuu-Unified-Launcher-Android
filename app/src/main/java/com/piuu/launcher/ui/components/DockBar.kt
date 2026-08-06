@@ -136,7 +136,7 @@ fun DockIconItem(
             ) {
                 AppIconImage(
                     packageName = app.package_name,
-                    modifier = Modifier.size((iconSize * 0.46f).dp),
+                    modifier = Modifier.size((iconSize * 0.85f).dp),
                     fallbackIconName = app.icon_name,
                     tintColor = if (app.icon_name == "brain") AccentPurple else Color.White
                 )

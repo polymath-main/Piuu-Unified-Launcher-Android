@@ -713,46 +713,47 @@ fun HomeScreen(
         ) { pageIndex ->
             val page = pages.getOrNull(pageIndex)
             if (page != null) {
-                // Flex & Grid container with proper padding & margin scopes
+                // Standard Android 4-Column Launcher Grid Container
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
+                    columns = GridCells.Fixed(4),
                     modifier = Modifier
                         .fillMaxSize()
                         .combinedClickable(
                             onClick = {},
                             onLongClick = { showHomescreenOptions = true }
                         )
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Page Title Header Span
-                    item(span = { GridItemSpan(2) }) {
+                    item(span = { GridItemSpan(4) }) {
                         Text(
                             text = page.title,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextMuted,
-                            modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp)
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 2.dp)
                         )
                     }
 
-                    // Render grid widget items with flexible span management
+                    // Render grid widget items with flexible 1-4 span management matching Android standards
                     items(
                         items = page.elements,
                         key = { it.element_id },
                         span = { elem ->
-                            val defaultSpan = when (elem.type) {
+                            val defaultWidth = when (elem.type) {
                                 ElementType.CLOCK,
                                 ElementType.WEATHER,
                                 ElementType.AGENT_WIDGET,
                                 ElementType.MEDIA_PLAYER,
                                 ElementType.PIUU_SUITE_FOLDER,
                                 ElementType.NOTIFICATION_CENTER,
-                                ElementType.CUSTOM_CARD -> 2
-                                else -> 1
+                                ElementType.CUSTOM_CARD -> 4
+                                else -> 2
                             }
-                            val spanWidth = if ((elem.style_props.w ?: if (defaultSpan == 2) 4 else 2) >= 3) 2 else 1
+                            val requestedWidth = elem.style_props.w ?: defaultWidth
+                            val spanWidth = requestedWidth.coerceIn(1, 4)
                             GridItemSpan(spanWidth)
                         }
                     ) { elem ->
