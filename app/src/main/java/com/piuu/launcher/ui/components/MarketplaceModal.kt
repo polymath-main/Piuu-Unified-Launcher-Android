@@ -92,9 +92,20 @@ fun MarketplaceModal(
 }""".trimIndent())
     }
 
-    var sdkTestOutput by remember { mutableStateOf("Ready to execute Marketplace Core SDK commands...") }
+    val builtinItems = remember {
+        listOf(
+            MarketplaceItem("builtin_piuu_notes", "Piuu Notes & Quick Memo", "1.0.0", "General", "Piuu Suite", "Persistent notes and quick memo launcher widget", "widgets", rating = 5.0f, is_installed = true),
+            MarketplaceItem("builtin_pip_edge", "Piuu Side Edge Assist", "1.0.0", "General", "Piuu Suite", "Floating side edge bar with quick notes & app access", "widgets", rating = 5.0f, is_installed = true),
+            MarketplaceItem("builtin_piuu_control", "Piuu Launcher Control Hub", "1.0.0", "General", "Piuu Suite", "Native C telemetry performance & system control hub", "widgets", rating = 5.0f, is_installed = true)
+        )
+    }
 
-    val filteredItems = catalog.filter { item ->
+    val combinedCatalog = remember(catalog) {
+        val existingIds = catalog.map { it.id }.toSet()
+        builtinItems.filterNot { existingIds.contains(it.id) } + catalog
+    }
+
+    val filteredItems = combinedCatalog.filter { item ->
         val matchesCategory = if (selectedTab == "all" || selectedTab == "sdk_sandbox") true else item.category.equals(selectedTab, ignoreCase = true)
         val matchesQuery = searchQuery.isBlank() ||
                 item.name.contains(searchQuery, ignoreCase = true) ||

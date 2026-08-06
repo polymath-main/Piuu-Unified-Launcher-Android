@@ -70,22 +70,27 @@ fun AppDrawer(
 
     val categories = listOf("all", "piuu_suite", "social", "productivity", "entertainment", "utilities", "system")
 
-    val launcherSettingsApp = remember {
+    var showNotesDialog by remember { mutableStateOf(false) }
+
+    val launcherNotesApp = remember {
         SystemApp(
-            name = "Launcher Settings",
-            package_name = "com.piuu.launcher.settings",
-            icon_name = "settings",
-            category = "system",
-            launch_intent = "com.piuu.launcher.SETTINGS"
+            name = "Piuu Notes",
+            package_name = "com.piuu.launcher.notes",
+            icon_name = "edit_note",
+            category = "piuu_suite",
+            launch_intent = "com.piuu.launcher.NOTES"
         )
     }
 
     val combinedApps = remember(apps) {
+        val extraApps = mutableListOf<SystemApp>()
         if (apps.none { it.package_name == "com.piuu.launcher.settings" }) {
-            listOf(launcherSettingsApp) + apps
-        } else {
-            apps
+            extraApps.add(launcherSettingsApp)
         }
+        if (apps.none { it.package_name == "com.piuu.launcher.notes" }) {
+            extraApps.add(launcherNotesApp)
+        }
+        extraApps + apps
     }
 
     val filteredApps = combinedApps.filter { app ->
@@ -100,6 +105,8 @@ fun AppDrawer(
         if (app.package_name == "com.piuu.launcher.settings") {
             onDismiss()
             onOpenQuickSettings()
+        } else if (app.package_name == "com.piuu.launcher.notes") {
+            showNotesDialog = true
         } else {
             onLaunchApp(app)
         }
@@ -492,6 +499,7 @@ fun getAppIconVector(iconName: String) = when(iconName) {
     "video" -> Icons.Default.PlayCircle
     "calendar" -> Icons.Default.CalendarToday
     "settings" -> Icons.Default.Settings
+    "edit_note" -> Icons.Default.EditNote
     "note" -> Icons.Default.EditNote
     "calculator" -> Icons.Default.Calculate
     "cloud" -> Icons.Default.Cloud
