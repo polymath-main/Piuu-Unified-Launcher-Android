@@ -1,16 +1,16 @@
 name: Android CI Build & Native C Core Compilation
 
 on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
   workflow_dispatch:
+  push:
+    tags: [ "v*" ]
 
 jobs:
   build:
     name: Build Native C Binary & Android APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout Repository
@@ -28,11 +28,12 @@ jobs:
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1" "build-tools;34.0.0"
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
 
-    - name: Set up Gradle 8.7
+    - name: Set up Gradle 8.7 (Cache Disabled)
       uses: gradle/actions/setup-gradle@v4
       with:
         gradle-version: 8.7
         validate-wrappers: false
+        cache-disabled: true
 
     - name: Restore Debug Keystore
       env:
@@ -50,10 +51,10 @@ jobs:
           keytool -genkeypair -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
         fi
 
-    - name: Build Native C Core Library & APKs
+    - name: Build Native C Core Library & APKs (Clean Build)
       run: |
-        chmod +x gradlew 2>/dev/null || true
-        gradle assembleDebug assembleRelease --no-daemon
+        chmod +x gradlew 2>/devnull || true
+        gradle clean assembleDebug assembleRelease --no-daemon
 
     - name: Upload Debug & Release APK Artifacts
       uses: actions/upload-artifact@v4
@@ -70,3 +71,50 @@ jobs:
         path: |
           app/build/intermediates/cxx/**/libpiuu_core.so
           app/build/intermediates/merged_native_libs/**/libpiuu_core.so
+
+    - name: Prepare Release APK Artifacts with Versioning & Architecture (Cloud Automated)
+      run: |
+        mkdir -p release_assets
+        if [ -n "$GITHUB_REF_NAME" ]; then
+          VERSION_TAG="$GITHUB_REF_NAME"
+        else
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          VERSION_TAG="v1.0.0-${SHORT_SHA}"
+        fi
+        
+        echo "Cloud Automated Release Version: ${VERSION_TAG}"
+        
+        # Copy and format APK names according to versioning rule: launcher_name + version + architecture + apk
+        find app/build/outputs/apk -name "*.apk" -type f | while read -r apk_file; do
+          filename=$(basename "$apk_file")
+          if [[ "$filename" == *"release"* ]]; then
+            cp "$apk_file" "release_assets/PiuuLauncher-${VERSION_TAG}-universal-release.apk"
+          elif [[ "$filename" == *"debug"* ]]; then
+            cp "$apk_file" "release_assets/PiuuLauncher-${VERSION_TAG}-universal-debug.apk"
+          fi
+        done
+        ls -la release_assets/
+
+    - name: Publish GitHub Release Assets (Cloud Automated)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.0.0-release' }}
+        files: release_assets/*.apk
+        name: "Piuu Launcher ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.0.0-release' }}"
+        body: |
+          ## 🚀 Piuu Unified Launcher Cloud Automated Release
+          
+          ### 📱 Official Versioned Release Assets (Automated Cloud Build)
+          * **Production Release**: `PiuuLauncher-${{ github.ref_name }}-universal-release.apk`
+          * **Developer Debug**: `PiuuLauncher-${{ github.ref_name }}-universal-debug.apk`
+          
+          ### 🏛️ Features Included
+          * POSIX C Shared Binary Core (`libpiuu_core.so` 16KB Page Aligned)
+          * Kotlin Jetpack Compose 4-Column Grid UI & 2D Matrix Resizing
+          * App Drawer Status Bar Margin Fit & Smart Usage Row
+          * Piuu Extension Studio Desktop Builder Specs
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
