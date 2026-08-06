@@ -1,11 +1,12 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'kotlin-kapt'
 }
 
 android {
     namespace 'com.piuu.launcher'
-    compileSdk 34
+    compileSdk 36
 
     defaultConfig {
         applicationId "com.aistudio.piuulauncher.app"
@@ -16,6 +17,20 @@ android {
 
         buildConfigField("String", "GEMINI_API_KEY", "\"${System.getenv("GEMINI_API_KEY") ?: ""}\"")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        externalNativeBuild {
+            cmake {
+                cFlags "-O3 -Wall -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                abiFilters 'arm64-v8a', 'x86_64', 'armeabi-v7a'
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+            version "3.22.1"
+        }
     }
 
     buildTypes {
@@ -76,7 +91,7 @@ dependencies {
     // Room Database
     implementation 'androidx.room:room-runtime:2.6.1'
     implementation 'androidx.room:room-ktx:2.6.1'
-    annotationProcessor 'androidx.room:room-compiler:2.6.1'
+    kapt 'androidx.room:room-compiler:2.6.1'
 
     // Supabase
     implementation 'io.github.jan-tennert.supabase:postgrest-kt:2.0.0'

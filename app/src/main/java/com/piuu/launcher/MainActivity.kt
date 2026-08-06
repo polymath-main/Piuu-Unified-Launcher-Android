@@ -67,27 +67,31 @@ class MainActivity : ComponentActivity() {
 
         // Register dynamic WallpaperColors listener to extract primary/secondary colors from the system wallpaper and apply dynamically
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
-            val wallpaperManager = android.app.WallpaperManager.getInstance(applicationContext)
-            val wallpaperHandler = WallpaperHandler(applicationContext)
-            val listener = android.app.WallpaperManager.OnColorsChangedListener { colors, which ->
-                if (which and android.app.WallpaperManager.FLAG_SYSTEM != 0) {
-                    val palette = wallpaperHandler.extractWallpaperPalette()
-                    val currentSchema = repository.getSchema()
-                    val updatedTheme = currentSchema.theme.copy(
-                        primary_color = palette.primaryHex,
-                        accent_color = palette.vibrantHex,
-                        bg_overlay = palette.bgOverlayHex
-                    )
-                    repository.saveSchema(currentSchema.copy(theme = updatedTheme))
-                    runOnUiThread {
-                        resetUiStateCallback?.invoke()
+            try {
+                val wallpaperManager = android.app.WallpaperManager.getInstance(applicationContext)
+                val wallpaperHandler = WallpaperHandler(applicationContext)
+                val listener = android.app.WallpaperManager.OnColorsChangedListener { colors, which ->
+                    if (which and android.app.WallpaperManager.FLAG_SYSTEM != 0) {
+                        try {
+                            val palette = wallpaperHandler.extractWallpaperPalette()
+                            val currentSchema = repository.getSchema()
+                            val updatedTheme = currentSchema.theme.copy(
+                                primary_color = palette.primaryHex,
+                                accent_color = palette.vibrantHex,
+                                bg_overlay = palette.bgOverlayHex
+                            )
+                            repository.saveSchema(currentSchema.copy(theme = updatedTheme))
+                            runOnUiThread {
+                                resetUiStateCallback?.invoke()
+                            }
+                        } catch (t: Throwable) {
+                            android.util.Log.e("MainActivity", "Error handling wallpaper color change", t)
+                        }
                     }
                 }
-            }
-            try {
                 wallpaperManager.addOnColorsChangedListener(listener, android.os.Handler(android.os.Looper.getMainLooper()))
-            } catch (e: Exception) {
-                e.printStackTrace()
+            } catch (t: Throwable) {
+                android.util.Log.e("MainActivity", "Failed to register wallpaper colors listener", t)
             }
         }
 

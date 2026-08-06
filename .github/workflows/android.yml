@@ -1,13 +1,15 @@
-name: Android CI Build
+name: Android CI Build & Native C Core Compilation
 
 on:
   push:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
+    name: Build Native C Binary & Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -20,10 +22,16 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
 
-    - name: Set up Gradle 9.3.1
+    - name: Set up Android NDK & CMake
+      run: |
+        echo "Installing Android NDK and CMake..."
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1" "build-tools;34.0.0"
+        echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
+
+    - name: Set up Gradle 8.7
       uses: gradle/actions/setup-gradle@v4
       with:
-        gradle-version: 9.3.1
+        gradle-version: 8.7
         validate-wrappers: false
 
     - name: Restore Debug Keystore
@@ -38,15 +46,27 @@ jobs:
           echo "Debug keystore successfully restored from debug.keystore.base64 file."
         else
           echo "WARNING: Neither DEBUG_KEYSTORE_BASE64 secret nor debug.keystore.base64 file found."
-          echo "Generating a temporary debug keystore for compile check (Warning: SHA-1 signature will differ)..."
+          echo "Generating temporary debug keystore..."
           keytool -genkeypair -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
         fi
 
-    - name: Build Debug APK
-      run: gradle assembleDebug --no-daemon
+    - name: Build Native C Core Library & APKs
+      run: |
+        chmod +x gradlew 2>/dev/null || true
+        gradle assembleDebug assembleRelease --no-daemon
 
-    - name: Upload Debug APK Artifact
+    - name: Upload Debug & Release APK Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: app-debug-apk
-        path: app/build/outputs/apk/debug/app-debug.apk
+        name: piuu-launcher-apks
+        path: |
+          app/build/outputs/apk/debug/*.apk
+          app/build/outputs/apk/release/*.apk
+
+    - name: Upload Native C Core Shared Libraries (.so)
+      uses: actions/upload-artifact@v4
+      with:
+        name: libpiuu_core-native-libraries
+        path: |
+          app/build/intermediates/cxx/**/libpiuu_core.so
+          app/build/intermediates/merged_native_libs/**/libpiuu_core.so
