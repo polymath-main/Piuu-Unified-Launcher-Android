@@ -43,6 +43,8 @@ JNIEXPORT jdouble JNICALL Java_com_piuu_launcher_repository_LibC_nativeGetCpuUsa
 JNIEXPORT jdoubleArray JNICALL Java_com_piuu_launcher_repository_LibC_nativeGetMemInfo(JNIEnv* env, jobject thiz);
 JNIEXPORT jint JNICALL Java_com_piuu_launcher_repository_LibC_nativeGetThreadCount(JNIEnv* env, jobject thiz);
 JNIEXPORT jint JNICALL Java_com_piuu_launcher_repository_LibC_nativeKillProcess(JNIEnv* env, jobject thiz, jstring jpackageName, jint pid);
+JNIEXPORT jstring JNICALL Java_com_piuu_launcher_repository_LibC_getSystemMetrics(JNIEnv *env, jobject thiz);
+JNIEXPORT jobject JNICALL Java_com_piuu_launcher_repository_LibC_allocateArena(JNIEnv *env, jobject thiz, jint size);
 
 #ifdef __cplusplus
 }
