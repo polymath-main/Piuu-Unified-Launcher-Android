@@ -266,7 +266,7 @@ class FloatingOverlayService : Service() {
     private fun updateWindowDimensions(expanded: Boolean) {
         val currentParams = params ?: return
         if (expanded) {
-            currentParams.width = 340.dp.toPx(this)
+            currentParams.width = (340 * resources.displayMetrics.density).toInt()
             currentParams.height = WindowManager.LayoutParams.WRAP_CONTENT
             currentParams.flags = currentParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
         } else {
