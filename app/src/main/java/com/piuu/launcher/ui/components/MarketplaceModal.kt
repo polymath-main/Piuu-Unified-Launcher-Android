@@ -92,11 +92,13 @@ fun MarketplaceModal(
 }""".trimIndent())
     }
 
+    var sdkTestOutput by remember { mutableStateOf("") }
+
     val builtinItems = remember {
         listOf(
-            MarketplaceItem("builtin_piuu_notes", "Piuu Notes & Quick Memo", "1.0.0", "General", "Piuu Suite", "Persistent notes and quick memo launcher widget", "widgets", rating = 5.0f, is_installed = true),
-            MarketplaceItem("builtin_pip_edge", "Piuu Side Edge Assist", "1.0.0", "General", "Piuu Suite", "Floating side edge bar with quick notes & app access", "widgets", rating = 5.0f, is_installed = true),
-            MarketplaceItem("builtin_piuu_control", "Piuu Launcher Control Hub", "1.0.0", "General", "Piuu Suite", "Native C telemetry performance & system control hub", "widgets", rating = 5.0f, is_installed = true)
+            MarketplaceItem("builtin_piuu_notes", "Piuu Notes & Quick Memo", "widgets", "Piuu Suite", 5.0f, 1250, "Persistent notes and quick memo launcher widget", is_installed = true),
+            MarketplaceItem("builtin_pip_edge", "Piuu Side Edge Assist", "widgets", "Piuu Suite", 5.0f, 980, "Floating side edge bar with quick notes & app access", is_installed = true),
+            MarketplaceItem("builtin_piuu_control", "Piuu Launcher Control Hub", "widgets", "Piuu Suite", 5.0f, 1420, "Native C telemetry performance & system control hub", is_installed = true)
         )
     }
 

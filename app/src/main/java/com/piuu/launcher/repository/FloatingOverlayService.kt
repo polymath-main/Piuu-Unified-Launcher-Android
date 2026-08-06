@@ -45,6 +45,33 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.piuu.launcher.model.SystemApp
+import android.os.Bundle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.SavedStateRegistryOwner
+
+class FloatingLifecycleOwner : LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
+    private val lifecycleRegistry = LifecycleRegistry(this)
+    private val store = ViewModelStore()
+    private val savedStateRegistryController = SavedStateRegistryController.create(this)
+
+    override val lifecycle: Lifecycle get() = lifecycleRegistry
+    override val viewModelStore: ViewModelStore get() = store
+    override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
+
+    fun performRestore(savedState: Bundle?) {
+        savedStateRegistryController.performRestore(savedState)
+    }
+
+    fun handleLifecycleEvent(event: Lifecycle.Event) {
+        lifecycleRegistry.handleLifecycleEvent(event)
+    }
+}
 
 class FloatingOverlayService : Service() {
 
@@ -112,7 +139,7 @@ class FloatingOverlayService : Service() {
 
         dismissParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
-            120.dp.toPx(this),
+            (120 * resources.displayMetrics.density).toInt(),
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
             PixelFormat.TRANSLUCENT
@@ -564,8 +591,8 @@ fun NotesPipContent() {
 @Composable
 fun QuickAppSwitcherContent(onLaunch: () -> Unit) {
     val context = LocalContext.current
-    val repository = remember { LauncherRepository.getInstance(context) }
-    val apps = remember { repository.getApps().take(8) }
+    val repository = remember { LauncherRepository(context) }
+    val apps = remember { repository.defaultApps.take(8) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Text("⚡ Quick App Access", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)

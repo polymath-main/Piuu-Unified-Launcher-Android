@@ -72,13 +72,29 @@ fun AppDrawer(
 
     var showNotesDialog by remember { mutableStateOf(false) }
 
+    val launcherSettingsApp = remember {
+        SystemApp(
+            package_name = "com.piuu.launcher.settings",
+            name = "Piuu Settings",
+            icon_name = "settings",
+            category = "piuu_suite",
+            launch_intent = "com.piuu.launcher.SETTINGS",
+            usage_count = 100,
+            accent_color = "#3B82F6",
+            description = "Piuu Launcher Preferences"
+        )
+    }
+
     val launcherNotesApp = remember {
         SystemApp(
-            name = "Piuu Notes",
             package_name = "com.piuu.launcher.notes",
+            name = "Piuu Notes",
             icon_name = "edit_note",
             category = "piuu_suite",
-            launch_intent = "com.piuu.launcher.NOTES"
+            launch_intent = "com.piuu.launcher.NOTES",
+            usage_count = 80,
+            accent_color = "#F59E0B",
+            description = "Quick Notepad & Tasks"
         )
     }
 
@@ -298,10 +314,10 @@ fun AppDrawer(
 
             // Frequently Used Row (if no search query)
             if (showFrequentlyUsed && searchQuery.isEmpty() && selectedCategory == "all") {
+                val frequentApps = remember(combinedApps) { combinedApps.sortedByDescending { it.usage_count }.take(5) }
                 Text("Smart Usage", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-    val frequentApps = remember(apps) { apps.sortedByDescending { it.usage_count }.take(5) }
                     items(frequentApps, key = { app -> app.package_name }) { app ->
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
