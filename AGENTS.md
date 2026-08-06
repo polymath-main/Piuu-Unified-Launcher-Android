@@ -74,7 +74,7 @@ graph TD
 * **`piuu`** = **`main`** Branch: Production-stable baseline launcher containing standard components, 4-column Android grid, 2D matrix resizing, app shortcut picker, and element removal.
 * **`zen-piuu`** = **`master`** Branch: Extension architecture & core planned branch containing `PiuuExtensionPackage` bundle extractor, `piuu-studio-desktop` Electron builder, 1-Tap Theme Transformer Studio, and Master Architectural Plans.
 
-### Strict Branch Operating Rules
+### Strict Branch Operating Rules (See [`BRANCHING_RULES.md`](file:///data/data/com.termux/files/home/repo/Piuu-Unified-Launcher-Android/BRANCHING_RULES.md))
 1. **Never Develop Both Branches Simultaneously**: Working on both branches in the same turn creates system conflicts. Always focus exclusively on one target branch per task.
 2. **Always Confirm Branch Target**: Before executing changes or pushing code, clarify or confirm which branch is being targeted (`piuu` / `main` vs `zen-piuu` / `master`).
 
