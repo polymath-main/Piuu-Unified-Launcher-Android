@@ -94,6 +94,8 @@ fun AppDrawer(
         matchesQuery && matchesCategory
     }
 
+    val frequentApps = remember(apps) { apps.sortedByDescending { it.usage_count }.take(5) }
+
     val handleAppClick: (SystemApp) -> Unit = { app ->
         if (app.package_name == "com.piuu.launcher.settings") {
             onDismiss()
