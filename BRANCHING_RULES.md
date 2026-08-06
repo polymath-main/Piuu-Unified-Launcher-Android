@@ -28,6 +28,10 @@
 ### Rule 3: Single-Branch Release Alignment
 * When pushing release tags or release builds (e.g. `v1.0.0-release`), verify that the tag points to a verified successful CI run on the intended branch segment without altering the parallel branch.
 
+### Rule 4: No Automatic Pushing & Manual Workflow Dispatch Only
+* **DO NOT** run `git push` automatically on every minor code edit. Store commits locally and ONLY push when explicitly commanded by the user.
+* Workflow builds are configured for `workflow_dispatch` (manual trigger) or explicit release tags (`v*`). Code pushes will NOT trigger automatic cloud workflow builds.
+
 ---
 
 ## 🛠️ 3. Standard Git Workflow for AI Agents

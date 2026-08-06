@@ -1,12 +1,9 @@
 name: Android CI Build & Native C Core Compilation
 
 on:
-  push:
-    branches: [ "main", "master" ]
-    tags: [ "v*" ]
-  pull_request:
-    branches: [ "main", "master" ]
   workflow_dispatch:
+  push:
+    tags: [ "v*" ]
 
 jobs:
   build:

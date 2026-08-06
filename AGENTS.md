@@ -77,6 +77,7 @@ graph TD
 ### Strict Branch Operating Rules (See [`BRANCHING_RULES.md`](file:///data/data/com.termux/files/home/repo/Piuu-Unified-Launcher-Android/BRANCHING_RULES.md))
 1. **Never Develop Both Branches Simultaneously**: Working on both branches in the same turn creates system conflicts. Always focus exclusively on one target branch per task.
 2. **Always Confirm Branch Target**: Before executing changes or pushing code, clarify or confirm which branch is being targeted (`piuu` / `main` vs `zen-piuu` / `master`).
+3. **No Automatic Pushing**: Do NOT execute `git push` automatically on every minor code change. Keep commits locally and ONLY push when the user explicitly instructs you to push. Workflow builds are manual-dispatch only (`workflow_dispatch`).
 
 ---
 
