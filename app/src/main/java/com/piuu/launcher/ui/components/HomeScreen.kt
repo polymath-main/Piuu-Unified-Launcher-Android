@@ -1041,12 +1041,17 @@ fun HomeScreen(
                             Color.Transparent
                         }
 
-                        val widgetHeight = when (elem.style_props.h ?: 2) {
-                            1 -> 95.dp
-                            2 -> 145.dp
-                            3 -> 215.dp
-                            4 -> 285.dp
-                            else -> 145.dp
+                        val is1x1AppTile = elem.type == ElementType.APP_GRID && (elem.style_props.w ?: 1) == 1 && (elem.style_props.h ?: 1) == 1
+                        val widgetHeight = if (is1x1AppTile) {
+                            72.dp
+                        } else {
+                            when (elem.style_props.h ?: 2) {
+                                1 -> 80.dp
+                                2 -> 145.dp
+                                3 -> 215.dp
+                                4 -> 285.dp
+                                else -> 145.dp
+                            }
                         }
 
                         val isHovered = hoveredElementId == elem.element_id
