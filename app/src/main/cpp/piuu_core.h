@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <dirent.h>
+#include <signal.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
 #include <sys/stat.h>
