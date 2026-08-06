@@ -68,17 +68,23 @@ graph TD
 
 ---
 
-## 🌿 Git Branching Strategy & Conventions
+## 🌿 Git Branching Strategy, Nicknames & Rules
 
-* **`main` Branch**: Production-stable launcher release containing standard launcher components, 4-column Android grid, 2D matrix resizing, pin app shortcut picker, and context menu element removal.
-* **`master` Branch**: Developer architecture branch containing all new extension SDK features, `PiuuExtensionPackage` bundle extractor, `piuu-studio-desktop` Electron builder, 1-Tap Theme Transformer Studio, and Master Architectural Plans.
+### Branch Nicknames
+* **`piuu`** = **`main`** Branch: Production-stable baseline launcher containing standard components, 4-column Android grid, 2D matrix resizing, app shortcut picker, and element removal.
+* **`zen-piuu`** = **`master`** Branch: Extension architecture & core planned branch containing `PiuuExtensionPackage` bundle extractor, `piuu-studio-desktop` Electron builder, 1-Tap Theme Transformer Studio, and Master Architectural Plans.
+
+### Strict Branch Operating Rules
+1. **Never Develop Both Branches Simultaneously**: Working on both branches in the same turn creates system conflicts. Always focus exclusively on one target branch per task.
+2. **Always Confirm Branch Target**: Before executing changes or pushing code, clarify or confirm which branch is being targeted (`piuu` / `main` vs `zen-piuu` / `master`).
 
 ---
 
 ## 🛠️ Instructions for Future AI Agents & Developers
 
-1. ** Obey Explicit Directives**: Always verify component parameters and signatures before passing properties (e.g., `LauncherTheme` uses `bg_overlay` and `primary_color`, not `card_glass`).
-2. **Never Guess Code Logic or Schemas**: Use `view_file` and `grep_search` to inspect data classes before modifying function invocations.
-3. **Preserve Native C Core Compatibility**: When editing C code in `app/src/main/cpp/`, ensure POSIX headers (`dirent.h`, `signal.h`, `unistd.h`) are included and CMake 16 KB page size alignment flags are retained.
-4. **Synchronous Theme Composition**: Use Compose `SideEffect` in `Theme.kt` when mutating active theme colors to prevent 1-frame visual flashes.
-5. **Always Verify Builds**: Verify CI/CD workflow status via `gh run list` after pushing commits.
+1. **Obey Branch Nicknames & Rules**: `piuu` refers to `main`; `zen-piuu` refers to `master`. Never touch both branches simultaneously.
+2. **Obey Explicit Directives**: Always verify component parameters and signatures before passing properties (e.g., `LauncherTheme` uses `bg_overlay` and `primary_color`, not `card_glass`).
+3. **Never Guess Code Logic or Schemas**: Use `view_file` and `grep_search` to inspect data classes before modifying function invocations.
+4. **Preserve Native C Core Compatibility**: When editing C code in `app/src/main/cpp/`, ensure POSIX headers (`dirent.h`, `signal.h`, `unistd.h`) are included and CMake 16 KB page size alignment flags are retained.
+5. **Synchronous Theme Composition**: Use Compose `SideEffect` in `Theme.kt` when mutating active theme colors to prevent 1-frame visual flashes.
+6. **Always Verify Builds**: Verify CI/CD workflow status via `gh run list` after pushing commits.
