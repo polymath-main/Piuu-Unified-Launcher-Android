@@ -305,17 +305,13 @@ class LauncherRepository(private val context: Context) {
                 emptyList()
             }
         } else {
-            emptyList()
-        }
-
-        // Auto-scan real device applications if list is empty or consists purely of legacy unresolvable default packages
-        if (list.isEmpty() || isLegacyDefaultListOnly(list)) {
+            // Scan and import real device applications on first-run startup
             val scanned = scanAndSaveInstalledApps(context)
             if (scanned.isNotEmpty()) {
-                list = scanned
-            } else if (list.isEmpty()) {
+                scanned
+            } else {
                 saveApps(defaultApps)
-                list = defaultApps
+                defaultApps
             }
         }
 
@@ -343,22 +339,6 @@ class LauncherRepository(private val context: Context) {
         }
 
         return list
-    }
-
-    private fun isLegacyDefaultListOnly(list: List<SystemApp>): Boolean {
-        if (list.isEmpty()) return true
-        val pm = context.packageManager
-        // Check if none of the non-Piuu packages in list can be resolved by PackageManager
-        val nonPiuuApps = list.filter { !it.package_name.startsWith("com.piuu.") }
-        if (nonPiuuApps.isEmpty()) return false
-        val resolvableCount = nonPiuuApps.count { app ->
-            try {
-                pm.getLaunchIntentForPackage(app.package_name) != null
-            } catch (e: Exception) {
-                false
-            }
-        }
-        return resolvableCount == 0
     }
 
     fun scanAndSaveInstalledApps(ctx: Context): List<SystemApp> {

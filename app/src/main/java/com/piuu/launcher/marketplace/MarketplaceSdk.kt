@@ -159,9 +159,10 @@ object PiuuPluginSdk {
             val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
             val batteryLevel = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
 
-            val runtime = Runtime.getRuntime()
-            val usedMemMb = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
-            val maxMemMb = runtime.maxMemory() / (1024 * 1024)
+            val memInfo = com.piuu.launcher.repository.LibC.getMemInfo()
+            val cpuLoad = com.piuu.launcher.repository.LibC.systemCpuLoad.value
+            val usedMemMb = (memInfo.usedGb * 1024).toLong()
+            val maxMemMb = (memInfo.totalGb * 1024).toLong()
 
             val statFs = StatFs(Environment.getDataDirectory().path)
             val availableStorageGb = (statFs.availableBlocksLong * statFs.blockSizeLong) / (1024 * 1024 * 1024)
@@ -170,6 +171,7 @@ object PiuuPluginSdk {
                 "battery_level" to batteryLevel,
                 "used_ram_mb" to usedMemMb,
                 "max_ram_mb" to maxMemMb,
+                "cpu_load_pct" to cpuLoad.toInt(),
                 "available_storage_gb" to availableStorageGb,
                 "sdk_version" to SDK_VERSION,
                 "device_model" to "${Build.MANUFACTURER} ${Build.MODEL}"

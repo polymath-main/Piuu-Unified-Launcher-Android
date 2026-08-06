@@ -54,9 +54,18 @@ fun AppDrawer(
     val drawerIconSize = configManager.config.drawerIconSize
     val drawerShowLabels = prefManager.drawerShowLabels
 
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidthDp = configuration.screenWidthDp
+    val dynamicColumnCount = remember(screenWidthDp, columnCount) {
+        if (screenWidthDp > 600) {
+            (screenWidthDp / 90).coerceIn(columnCount, 8)
+        } else {
+            columnCount
+        }
+    }
+
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("all") }
-    var isListView by remember { mutableStateOf(false) }
 
     val categories = listOf("all", "piuu_suite", "social", "productivity", "entertainment", "utilities", "system")
 
@@ -64,11 +73,9 @@ fun AppDrawer(
         val matchesQuery = app.name.contains(searchQuery, ignoreCase = true) || app.package_name.contains(searchQuery, ignoreCase = true)
         val matchesCategory = if (selectedCategory == "all") true else app.category.equals(selectedCategory, ignoreCase = true)
         matchesQuery && matchesCategory
-    }.sortedBy { it.name.lowercase() }
+    }
 
     val frequentApps = apps.sortedByDescending { it.usage_count }.take(4)
-
-    val alphabetList = remember { listOf("#") + ('A'..'Z').map { it.toString() } }
 
     // Reactive preference state triggers
     var prefVersion by remember { mutableIntStateOf(0) }
@@ -136,7 +143,7 @@ fun AppDrawer(
                             .navigationBarsPadding()
                             .padding(horizontal = 18.dp, vertical = 18.dp)
                     ) {
-                // Header Search Input & Grid/List Toggle Row
+                // Header Search Input & Close Button Row
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
@@ -164,19 +171,7 @@ fun AppDrawer(
                         ),
                         modifier = Modifier.weight(1f)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    IconButton(
-                        onClick = { isListView = !isListView },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(CardGlassBg)
-                    ) {
-                        Icon(
-                            imageVector = if (isListView) Icons.Default.GridView else Icons.Default.FormatListBulleted,
-                            contentDescription = "Toggle View",
-                            tint = PrimaryBlue
-                        )
-                    }
+                    Spacer(modifier = Modifier.width(8.dp))
                     IconButton(onClick = onDismiss) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
                     }
@@ -314,7 +309,7 @@ fun AppDrawer(
             // App Grid with scroll mode support
             val scrollMode = prefManager.drawerScrollMode
             if (scrollMode == "HORIZONTAL") {
-                val itemsPerPage = (columnCount * 4).coerceAtLeast(8)
+                val itemsPerPage = (dynamicColumnCount * 4).coerceAtLeast(8)
                 val pagesOfApps = filteredApps.chunked(itemsPerPage)
                 if (pagesOfApps.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -329,7 +324,7 @@ fun AppDrawer(
                         ) { pageIdx ->
                             val pageApps = pagesOfApps[pageIdx]
                             LazyVerticalGrid(
-                                columns = GridCells.Fixed(columnCount),
+                                columns = GridCells.Fixed(dynamicColumnCount),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp),
                                 modifier = Modifier.fillMaxSize()
@@ -368,7 +363,7 @@ fun AppDrawer(
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(columnCount),
+                    columns = GridCells.Fixed(dynamicColumnCount),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize()
@@ -444,63 +439,7 @@ fun AppGridTileItem(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.width(iconSize.dp)
             )
-@Composable
-fun AppListRowItem(
-    app: SystemApp,
-    iconSize: Int,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(CardGlassBg)
-            .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
-            .longPressPulseEffect(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(CircleShape)
-                .background(PrimaryBlue.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center
-        ) {
-            AppIconImage(
-                packageName = app.package_name,
-                modifier = Modifier.size(24.dp),
-                fallbackIconName = app.icon_name,
-                tintColor = if (app.category == "piuu_suite") SuccessGreen else PrimaryBlue
-            )
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = app.name,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-            Text(
-                text = app.package_name,
-                fontSize = 11.sp,
-                color = TextMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        Text(
-            text = app.category.uppercase(),
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = PrimaryBlue,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(PrimaryBlue.copy(alpha = 0.15f))
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-        )
     }
 }
 

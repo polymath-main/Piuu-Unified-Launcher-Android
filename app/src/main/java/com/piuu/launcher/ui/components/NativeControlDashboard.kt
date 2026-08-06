@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.piuu.launcher.model.*
 import com.piuu.launcher.repository.AiEngine
 import com.piuu.launcher.repository.LatencyManager
+import com.piuu.launcher.repository.LibC
 import com.piuu.launcher.repository.LauncherConfigManager
 import com.piuu.launcher.repository.LauncherPreferenceManager
 import com.piuu.launcher.repository.LauncherRepository
@@ -47,6 +48,7 @@ fun NativeControlDashboard(
     onDismiss: () -> Unit,
     onOpenMarketplace: () -> Unit,
     onOpenSchemaEditor: () -> Unit,
+    onPrefChanged: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -191,7 +193,66 @@ fun NativeControlDashboard(
                         }
                     }
 
-                    // Launcher Styling Tuning Section
+                    // LibC Core Statistics Card
+                    item {
+                        val libCMemInfo = remember { LibC.getMemInfo() }
+                        val libCAllocated by LibC.totalMemoryAllocated.collectAsState()
+                        val libCThreads = remember { LibC.getThreadCount() }
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, LauncherBorder, RoundedCornerShape(20.dp)),
+                            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Memory,
+                                        contentDescription = null,
+                                        tint = AccentPurple,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "LibC Unified Binary Core Status",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("NATIVE HEAP", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(String.format("%.1f MB", libCMemInfo.nativeHeapAllocatedMb), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AccentPurple)
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("UNIFIED ALLOC", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(String.format("%.1f KB", libCAllocated / 1024.0), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("ACTIVE THREADS", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text("$libCThreads active", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = SuccessGreen)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // App Drawer Customization Section
                     item {
                         Card(
                             modifier = Modifier
@@ -205,23 +266,23 @@ fun NativeControlDashboard(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(imageVector = Icons.Default.Tune, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(18.dp))
+                                    Icon(imageVector = Icons.Default.Apps, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Interface Layout Tuning", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                    Text("App Drawer Customization", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                 }
 
                                 Spacer(modifier = Modifier.height(16.dp))
 
                                 // Grid columns chooser
-                                Text("Drawer Columns Grid", fontSize = 12.sp, color = TextSecondary)
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("Drawer Grid Columns", fontSize = 12.sp, color = TextSecondary)
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     val columns = listOf(3, 4, 5, 6)
                                     columns.forEach { col ->
-                                        val isSelected = config.drawerColumns == col
+                                        val isSelected = prefManager.drawerColumnCount == col
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
@@ -229,9 +290,11 @@ fun NativeControlDashboard(
                                                 .background(if (isSelected) PrimaryBlue.copy(alpha = 0.2f) else CardGlassBg)
                                                 .border(1.dp, if (isSelected) PrimaryBlue else LauncherBorder, RoundedCornerShape(10.dp))
                                                 .clickable {
+                                                    prefManager.drawerColumnCount = col
                                                     configManager.config = config.copy(drawerColumns = col)
                                                     config = configManager.config
-                                                    Toast.makeText(context, "Layout columns set to $col", Toast.LENGTH_SHORT).show()
+                                                    onPrefChanged()
+                                                    Toast.makeText(context, "Drawer set to $col columns", Toast.LENGTH_SHORT).show()
                                                 }
                                                 .padding(vertical = 8.dp),
                                             contentAlignment = Alignment.Center
@@ -246,27 +309,146 @@ fun NativeControlDashboard(
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
 
-                                // Icon size tuning
-                                var sliderValue by remember { mutableStateOf(config.drawerIconSize.toFloat()) }
+                                // Scroll Orientation Chooser
+                                var scrollMode by remember { mutableStateOf(prefManager.drawerScrollMode) }
+                                Text("Scroll Direction", fontSize = 12.sp, color = TextSecondary)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val modes = listOf("VERTICAL" to "Vertical", "HORIZONTAL" to "Horizontal")
+                                    modes.forEach { (modeVal, modeLabel) ->
+                                        val isSelected = scrollMode == modeVal
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(if (isSelected) PrimaryBlue.copy(alpha = 0.2f) else CardGlassBg)
+                                                .border(1.dp, if (isSelected) PrimaryBlue else LauncherBorder, RoundedCornerShape(10.dp))
+                                                .clickable {
+                                                    prefManager.drawerScrollMode = modeVal
+                                                    scrollMode = modeVal
+                                                    onPrefChanged()
+                                                    Toast.makeText(context, "Scroll set to $modeLabel style", Toast.LENGTH_SHORT).show()
+                                                }
+                                                .padding(vertical = 8.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = modeLabel,
+                                                color = if (isSelected) PrimaryBlue else TextPrimary,
+                                                fontSize = 12.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Show App Icon Labels Toggle
+                                var showLabels by remember { mutableStateOf(prefManager.drawerShowLabels) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text("Show App Titles", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                        Text("Display labels below app drawer icons", fontSize = 10.sp, color = TextSecondary)
+                                    }
+                                    Switch(
+                                        checked = showLabels,
+                                        onCheckedChange = { checked ->
+                                            prefManager.drawerShowLabels = checked
+                                            showLabels = checked
+                                            onPrefChanged()
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = PrimaryBlue,
+                                            checkedTrackColor = PrimaryBlue.copy(alpha = 0.4f)
+                                        )
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Show Categories Tabs Toggle
+                                var showCategories by remember { mutableStateOf(prefManager.drawerShowCategories) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text("Drawer Category Tabs", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                        Text("Group apps dynamically into smart categories", fontSize = 10.sp, color = TextSecondary)
+                                    }
+                                    Switch(
+                                        checked = showCategories,
+                                        onCheckedChange = { checked ->
+                                            prefManager.drawerShowCategories = checked
+                                            showCategories = checked
+                                            onPrefChanged()
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = PrimaryBlue,
+                                            checkedTrackColor = PrimaryBlue.copy(alpha = 0.4f)
+                                        )
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Show Frequently Used Apps Toggle
+                                var showFreq by remember { mutableStateOf(prefManager.drawerShowFrequentlyUsed) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text("Frequently Used Apps", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                        Text("Display a row of recent launches at top", fontSize = 10.sp, color = TextSecondary)
+                                    }
+                                    Switch(
+                                        checked = showFreq,
+                                        onCheckedChange = { checked ->
+                                            prefManager.drawerShowFrequentlyUsed = checked
+                                            showFreq = checked
+                                            onPrefChanged()
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = PrimaryBlue,
+                                            checkedTrackColor = PrimaryBlue.copy(alpha = 0.4f)
+                                        )
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // App Drawer Blur slider
+                                var blurValue by remember { mutableStateOf(prefManager.appDrawerBlur.toFloat()) }
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("App Icon Size", fontSize = 12.sp, color = TextSecondary)
-                                    Text("${sliderValue.toInt()}px", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                                    Text("Drawer Background Blur", fontSize = 12.sp, color = TextSecondary)
+                                    Text("${blurValue.toInt()}dp", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
                                 }
                                 Slider(
-                                    value = sliderValue,
-                                    onValueChange = { sliderValue = it },
+                                    value = blurValue,
+                                    onValueChange = { blurValue = it },
                                     onValueChangeFinished = {
-                                        configManager.config = config.copy(drawerIconSize = sliderValue.toInt(), homeIconSize = sliderValue.toInt())
-                                        config = configManager.config
-                                        Toast.makeText(context, "Icon size updated to ${sliderValue.toInt()}px", Toast.LENGTH_SHORT).show()
+                                        prefManager.appDrawerBlur = blurValue.toInt()
+                                        onPrefChanged()
+                                        Toast.makeText(context, "Blur intensity set to ${blurValue.toInt()}dp", Toast.LENGTH_SHORT).show()
                                     },
-                                    valueRange = 40f..72f,
+                                    valueRange = 0f..30f,
                                     colors = SliderDefaults.colors(
                                         activeTrackColor = PrimaryBlue,
                                         thumbColor = PrimaryBlue
@@ -274,12 +456,91 @@ fun NativeControlDashboard(
                                     modifier = Modifier.fillMaxWidth()
                                 )
 
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // App Drawer transparency slider
+                                var transValue by remember { mutableStateOf(prefManager.appDrawerTransparency) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Drawer Transparency", fontSize = 12.sp, color = TextSecondary)
+                                    Text("${(transValue * 100).toInt()}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                                }
+                                Slider(
+                                    value = transValue,
+                                    onValueChange = { transValue = it },
+                                    onValueChangeFinished = {
+                                        prefManager.appDrawerTransparency = transValue
+                                        onPrefChanged()
+                                        Toast.makeText(context, "Transparency updated", Toast.LENGTH_SHORT).show()
+                                    },
+                                    valueRange = 0.1f..1.0f,
+                                    colors = SliderDefaults.colors(
+                                        activeTrackColor = PrimaryBlue,
+                                        thumbColor = PrimaryBlue
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+
+                    // Homescreen & Dock Settings Section
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, LauncherBorder, RoundedCornerShape(20.dp)),
+                            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(imageVector = Icons.Default.Home, contentDescription = null, tint = AccentPurple, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Homescreen & Dock Settings", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                }
+
                                 Spacer(modifier = Modifier.height(16.dp))
 
-                                // Adaptive Icon Shapes
+                                // General App Icon Size slider
+                                var sliderValue by remember { mutableStateOf(config.drawerIconSize.toFloat()) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("General Icon Size", fontSize = 12.sp, color = TextSecondary)
+                                    Text("${sliderValue.toInt()}px", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentPurple)
+                                }
+                                Slider(
+                                    value = sliderValue,
+                                    onValueChange = { sliderValue = it },
+                                    onValueChangeFinished = {
+                                        configManager.config = config.copy(drawerIconSize = sliderValue.toInt(), homeIconSize = sliderValue.toInt())
+                                        config = configManager.config
+                                        onPrefChanged()
+                                        Toast.makeText(context, "General icon size updated", Toast.LENGTH_SHORT).show()
+                                    },
+                                    valueRange = 40f..72f,
+                                    colors = SliderDefaults.colors(
+                                        activeTrackColor = AccentPurple,
+                                        thumbColor = AccentPurple
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Adaptive Icon Shapes chooser
                                 var activeShape by remember { mutableStateOf(prefManager.adaptiveIconShape) }
                                 Text("Adaptive Icon Shapes", fontSize = 12.sp, color = TextSecondary)
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -296,24 +557,172 @@ fun NativeControlDashboard(
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(if (isSelected) PrimaryBlue.copy(alpha = 0.2f) else CardGlassBg)
-                                                .border(1.dp, if (isSelected) PrimaryBlue else LauncherBorder, RoundedCornerShape(8.dp))
+                                                .background(if (isSelected) AccentPurple.copy(alpha = 0.2f) else CardGlassBg)
+                                                .border(1.dp, if (isSelected) AccentPurple else LauncherBorder, RoundedCornerShape(8.dp))
                                                 .clickable {
                                                     prefManager.adaptiveIconShape = shapeVal
                                                     activeShape = shapeVal
-                                                    Toast.makeText(context, "Icon shape set to $shapeLabel", Toast.LENGTH_SHORT).show()
+                                                    onPrefChanged()
+                                                    Toast.makeText(context, "Icon shape: $shapeLabel", Toast.LENGTH_SHORT).show()
                                                 }
                                                 .padding(vertical = 8.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
                                                 text = shapeLabel,
-                                                color = if (isSelected) PrimaryBlue else TextPrimary,
+                                                color = if (isSelected) AccentPurple else TextPrimary,
                                                 fontSize = 11.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                             )
                                         }
                                     }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Dock Visibility Toggle
+                                var dockVisible by remember { mutableStateOf(prefManager.dockVisible) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text("Enable Hotseat Dock", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                        Text("Show persistent bottom launch dock", fontSize = 10.sp, color = TextSecondary)
+                                    }
+                                    Switch(
+                                        checked = dockVisible,
+                                        onCheckedChange = { checked ->
+                                            prefManager.dockVisible = checked
+                                            dockVisible = checked
+                                            onPrefChanged()
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = AccentPurple,
+                                            checkedTrackColor = AccentPurple.copy(alpha = 0.4f)
+                                        )
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Dock Columns Selector
+                                Text("Dock Icons Limit", fontSize = 12.sp, color = TextSecondary)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val counts = listOf(3, 4, 5, 6)
+                                    counts.forEach { count ->
+                                        val isSelected = prefManager.dockIconCount == count
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(if (isSelected) AccentPurple.copy(alpha = 0.2f) else CardGlassBg)
+                                                .border(1.dp, if (isSelected) AccentPurple else LauncherBorder, RoundedCornerShape(10.dp))
+                                                .clickable {
+                                                    prefManager.dockIconCount = count
+                                                    onPrefChanged()
+                                                    Toast.makeText(context, "Dock configured for max $count icons", Toast.LENGTH_SHORT).show()
+                                                }
+                                                .padding(vertical = 8.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "$count Apps",
+                                                color = if (isSelected) AccentPurple else TextPrimary,
+                                                fontSize = 12.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Dock Icon Size slider
+                                var dockSizeVal by remember { mutableStateOf(prefManager.dockIconSize.toFloat()) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Dock Icons Size", fontSize = 12.sp, color = TextSecondary)
+                                    Text("${dockSizeVal.toInt()}px", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentPurple)
+                                }
+                                Slider(
+                                    value = dockSizeVal,
+                                    onValueChange = { dockSizeVal = it },
+                                    onValueChangeFinished = {
+                                        prefManager.dockIconSize = dockSizeVal.toInt()
+                                        onPrefChanged()
+                                        Toast.makeText(context, "Dock icon size updated", Toast.LENGTH_SHORT).show()
+                                    },
+                                    valueRange = 40f..72f,
+                                    colors = SliderDefaults.colors(
+                                        activeTrackColor = AccentPurple,
+                                        thumbColor = AccentPurple
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Dock Labels Visibility
+                                var dockLabelsVisible by remember { mutableStateOf(prefManager.dockShowLabels) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text("Show Dock App Labels", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                        Text("Show text titles below dock icons", fontSize = 10.sp, color = TextSecondary)
+                                    }
+                                    Switch(
+                                        checked = dockLabelsVisible,
+                                        onCheckedChange = { checked ->
+                                            prefManager.dockShowLabels = checked
+                                            dockLabelsVisible = checked
+                                            onPrefChanged()
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = AccentPurple,
+                                            checkedTrackColor = AccentPurple.copy(alpha = 0.4f)
+                                        )
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Show System Wallpaper Toggle
+                                var systemWallpaperEnabled by remember { mutableStateOf(config.showSystemWallpaper) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text("Show System Wallpaper", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                        Text("Allow active system wallpaper background", fontSize = 10.sp, color = TextSecondary)
+                                    }
+                                    Switch(
+                                        checked = systemWallpaperEnabled,
+                                        onCheckedChange = { checked ->
+                                            configManager.setWallpaperEnabled(checked)
+                                            config = configManager.config
+                                            systemWallpaperEnabled = checked
+                                            onPrefChanged()
+                                            Toast.makeText(context, if (checked) "Wallpaper transparency unlocked" else "Dynamic AMOLED black background applied", Toast.LENGTH_SHORT).show()
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = AccentPurple,
+                                            checkedTrackColor = AccentPurple.copy(alpha = 0.4f)
+                                        )
+                                    )
                                 }
                             }
                         }

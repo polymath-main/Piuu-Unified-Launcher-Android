@@ -30,23 +30,12 @@ val SuccessGreen = Color(0xFF10B981)
 val WarningAmber = Color(0xFFF59E0B)
 val DangerRed = Color(0xFFEF4444)
 
-val NeonCyan = Color(0xFF06B6D4)
-val NeonMagenta = Color(0xFFEC4899)
-val NeonLime = Color(0xFF84CC16)
-val SoftIndigo = Color(0xFF6366F1)
-
 val TextPrimary: Color get() = if (isDarkMode) Color(0xFFF8FAFC) else Color(0xFF0F172A)
 val TextSecondary: Color get() = if (isDarkMode) Color(0xFF94A3B8) else Color(0xFF475569)
 val TextMuted: Color get() = if (isDarkMode) Color(0xFF64748B) else Color(0xFF94A3B8)
 
 val CardGlassBg: Color get() = if (isDarkMode) Color(0x261E293B) else Color(0xF2FFFFFF)
 val CardBorder: Color get() = if (isDarkMode) Color(0x3338BDF8) else Color(0x333B82F6)
-
-val GlassDockSurface: Color get() = if (isDarkMode) Color(0x4D0F172A) else Color(0xD9FFFFFF)
-val GlassDockBorder: Color get() = if (isDarkMode) Color(0x3364748B) else Color(0x33CBD5E1)
-
-val PillSelectedBg: Color get() = activePrimaryColor.copy(alpha = 0.25f)
-val PillUnselectedBg: Color get() = if (isDarkMode) Color(0x1F64748B) else Color(0x1FE2E8F0)
 
 // Parsing utilities
 fun parseHexColor(hex: String, defaultColor: Color): Color {

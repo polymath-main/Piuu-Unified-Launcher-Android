@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.piuu.launcher.model.*
 import com.piuu.launcher.repository.AiEngine
 import com.piuu.launcher.repository.LatencyManager
+import com.piuu.launcher.repository.LibC
 import com.piuu.launcher.repository.LauncherRepository
 import com.piuu.launcher.repository.NotificationBridge
 import com.piuu.launcher.repository.FloatingOverlayService
@@ -144,6 +145,17 @@ fun LauncherAppMain(
     var schema by remember { mutableStateOf(repository.getSchema()) }
     var apps by remember { mutableStateOf(repository.getApps()) }
     var hiddenApps by remember { mutableStateOf(repository.getHiddenApps()) }
+
+    DisposableEffect(Unit) {
+        val callback = {
+            apps = repository.getApps()
+            hiddenApps = repository.getHiddenApps()
+        }
+        com.piuu.launcher.repository.PackageChangeReceiver.registerCallback(callback)
+        onDispose {
+            com.piuu.launcher.repository.PackageChangeReceiver.unregisterCallback(callback)
+        }
+    }
     val visibleApps = remember(apps, hiddenApps) { apps.filter { it.package_name !in hiddenApps } }
     var notes by remember { mutableStateOf(repository.getNotes()) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -160,6 +172,7 @@ fun LauncherAppMain(
 
     val configManager = remember { LauncherConfigManager.getInstance(context) }
     var configState by remember { mutableStateOf(configManager.config) }
+    var prefVersion by remember { mutableStateOf(0) }
 
     val notificationBridge = remember { NotificationBridge.getInstance(context) }
     val notifications by notificationBridge.notificationsFlow.collectAsState()
@@ -178,7 +191,7 @@ fun LauncherAppMain(
     var longPressedElement by remember { mutableStateOf<LauncherElement?>(null) }
     var previewOriginalTheme by remember { mutableStateOf<LauncherTheme?>(null) }
 
-    // Reset Callback for HOME key press
+    // Reset Callback for HOME key press and Periodic Telemetry Updates via LibC
     LaunchedEffect(Unit) {
         onRegisterResetCallback?.invoke {
             showDrawer = false
@@ -190,6 +203,24 @@ fun LauncherAppMain(
             showQuickSettings = false
             longPressedApp = null
             longPressedElement = null
+        }
+
+        // Low-level LibC telemetry polling loop
+        launch {
+            while (true) {
+                try {
+                    val memInfo = LibC.getMemInfo()
+                    val cpuLoad = LibC.systemCpuLoad.value
+                    metrics = metrics.copy(
+                        cpu_usage = cpuLoad.toInt().coerceIn(1, 99),
+                        ram_used_mb = memInfo.usedGb.toFloat(),
+                        ram_total_mb = memInfo.totalGb.toFloat()
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                kotlinx.coroutines.delay(2000) // Poll every 2 seconds
+            }
         }
     }
 
@@ -211,7 +242,7 @@ fun LauncherAppMain(
         }
     }
 
-    // Launch App helper with LatencyManager ultra-low latency bridge & fallback intent handling
+    // Launch App helper with LatencyManager ultra-low latency bridge
     val handleLaunchApp: (SystemApp) -> Unit = { app ->
         repository.recordAppLaunch(app.package_name)
         apps = repository.getApps()
@@ -230,11 +261,9 @@ fun LauncherAppMain(
                 toggleFloatingOverlay(context)
             }
             else -> {
-                val launched = latencyManager.launchAppFast(context, app.package_name) {
-                    Toast.makeText(context, "${app.name} is not installed on this device", Toast.LENGTH_SHORT).show()
-                }
+                val launched = LibC.forkAndExec(context, app.package_name)
                 if (!launched) {
-                    Log.w("MainActivity", "Could not launch package: ${app.package_name}")
+                    Toast.makeText(context, "Opening ${app.name}...", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -279,63 +308,67 @@ fun LauncherAppMain(
             )
 
             // Main Pager Home Screen
-            HomeScreen(
-                schema = schema,
-                metrics = metrics,
-                installedApps = visibleApps,
-                notes = notes,
-                onLaunchApp = handleLaunchApp,
-                onOpenDrawer = { showDrawer = true },
-                onOpenSearch = { showSearch = true },
-                onOpenBrainChat = { toggleFloatingOverlay(context) },
-                onOpenQuickSettings = { showQuickSettings = true },
-                onOpenWebView = { showWebView = true },
-                onOpenMarketplace = { showMarketplace = true },
-                onOpenMetrics = { showMetrics = true },
-                onOpenSchemaEditor = { showSchemaEditor = true },
-                onOpenFolder = { showDrawer = true },
-                onAddNote = { text ->
-                    val updated = notes.toMutableList().apply {
-                        add(NoteItem("n_${System.currentTimeMillis()}", text, "Just now", "#3B82F6"))
+            androidx.compose.runtime.key(prefVersion) {
+                HomeScreen(
+                    schema = schema,
+                    metrics = metrics,
+                    installedApps = visibleApps,
+                    notes = notes,
+                    onLaunchApp = handleLaunchApp,
+                    onOpenDrawer = { showDrawer = true },
+                    onOpenSearch = { showSearch = true },
+                    onOpenBrainChat = { toggleFloatingOverlay(context) },
+                    onOpenQuickSettings = { showQuickSettings = true },
+                    onOpenWebView = { showWebView = true },
+                    onOpenMarketplace = { showMarketplace = true },
+                    onOpenMetrics = { showMetrics = true },
+                    onOpenSchemaEditor = { showSchemaEditor = true },
+                    onOpenFolder = { showDrawer = true },
+                    onAddNote = { text ->
+                        val updated = notes.toMutableList().apply {
+                            add(NoteItem("n_${System.currentTimeMillis()}", text, "Just now", "#3B82F6"))
+                        }
+                        notes = updated
+                        repository.saveNotes(updated)
+                    },
+                    onLongPressApp = { longPressedApp = it },
+                    onLongPressElement = { longPressedElement = it },
+                    onSaveSchema = { updatedSchema ->
+                        schema = updatedSchema
+                        repository.saveSchema(updatedSchema)
                     }
-                    notes = updated
-                    repository.saveNotes(updated)
-                },
-                onLongPressApp = { longPressedApp = it },
-                onLongPressElement = { longPressedElement = it },
-                onSaveSchema = { updatedSchema ->
-                    schema = updatedSchema
-                    repository.saveSchema(updatedSchema)
-                }
-            )
+                )
+            }
         }
 
         // ── Overlays & Bottom Sheets ─────────────────────────────────────────
 
         // App Drawer
-        AppDrawer(
-            visible = showDrawer,
-            apps = visibleApps,
-            onDismiss = { showDrawer = false },
-            onLaunchApp = { app ->
-                showDrawer = false
-                handleLaunchApp(app)
-            },
-            onToggleFavorite = { app ->
-                val updated = apps.toMutableList()
-                val idx = updated.indexOfFirst { it.package_name == app.package_name }
-                if (idx != -1) {
-                    updated[idx] = updated[idx].copy(is_favorite = !updated[idx].is_favorite)
-                    apps = updated
-                    repository.saveApps(updated)
-                }
-            },
-            onLongPressApp = { app ->
-                showDrawer = false
-                longPressedApp = app
-            },
-            onAutoCategorize = handleAutoCategorizeApps
-        )
+        androidx.compose.runtime.key(prefVersion) {
+            AppDrawer(
+                visible = showDrawer,
+                apps = visibleApps,
+                onDismiss = { showDrawer = false },
+                onLaunchApp = { app ->
+                    showDrawer = false
+                    handleLaunchApp(app)
+                },
+                onToggleFavorite = { app ->
+                    val updated = apps.toMutableList()
+                    val idx = updated.indexOfFirst { it.package_name == app.package_name }
+                    if (idx != -1) {
+                        updated[idx] = updated[idx].copy(is_favorite = !updated[idx].is_favorite)
+                        apps = updated
+                        repository.saveApps(updated)
+                    }
+                },
+                onLongPressApp = { app ->
+                    showDrawer = false
+                    longPressedApp = app
+                },
+                onAutoCategorize = handleAutoCategorizeApps
+            )
+        }
 
         // Universal Search
         GlobalSearchModal(
@@ -577,7 +610,11 @@ fun LauncherAppMain(
                     },
                     onDismiss = { showWebView = false },
                     onOpenMarketplace = { showMarketplace = true },
-                    onOpenSchemaEditor = { showSchemaEditor = true }
+                    onOpenSchemaEditor = { showSchemaEditor = true },
+                    onPrefChanged = {
+                        prefVersion++
+                        configState = configManager.config
+                    }
                 )
             }
         }

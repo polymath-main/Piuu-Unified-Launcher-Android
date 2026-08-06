@@ -53,12 +53,10 @@ class LatencyManager private constructor() {
             packageNames.forEach { pkg ->
                 if (!intentCache.containsKey(pkg)) {
                     try {
-                        var intent = pm.getLaunchIntentForPackage(pkg)
-                        if (intent == null) {
-                            intent = resolveCategoryFallbackIntent(context, pkg)
+                        val intent = pm.getLaunchIntentForPackage(pkg)?.apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                         }
                         if (intent != null) {
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                             intentCache[pkg] = intent
                         }
                     } catch (e: Exception) {
@@ -72,7 +70,7 @@ class LatencyManager private constructor() {
     /**
      * Ultra-fast app launcher bridge.
      * Launches the app in <16ms by using cached launch intents and hardware animation bundles.
-     * Automatically resolves system action category fallbacks if specific package intent is not found.
+     * Falls back to standard launcher handling if the package is simulated or custom.
      */
     fun launchAppFast(
         context: Context,
@@ -87,23 +85,20 @@ class LatencyManager private constructor() {
         // 2. Fallback to package manager lookup if not in cache
         if (intent == null) {
             try {
-                intent = context.packageManager.getLaunchIntentForPackage(packageName)
+                intent = context.packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                }
+                if (intent != null) {
+                    intentCache[packageName] = intent
+                }
             } catch (e: Exception) {
                 Log.e("LatencyManager", "Error resolving launch intent for $packageName", e)
             }
         }
 
-        // 3. Fallback resolution for standard system categories & actions if specific package launch intent is null
-        if (intent == null) {
-            intent = resolveCategoryFallbackIntent(context, packageName)
-        }
-
-        // 4. Execute Launch
-        if (intent != null) {
+        // 3. Execute Launch
+        return if (intent != null) {
             try {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-                intentCache[packageName] = intent
-
                 val options = ActivityOptions.makeCustomAnimation(
                     context,
                     android.R.anim.fade_in,
@@ -116,86 +111,18 @@ class LatencyManager private constructor() {
                 launchLatencyMetrics[packageName] = elapsedMs
                 _lastLaunchTimeMs.value = elapsedMs
                 Log.d("LatencyManager", "App $packageName launched in ${elapsedMs}ms")
-                return true
+                true
             } catch (e: Exception) {
-                Log.e("LatencyManager", "Failed to launch intent for $packageName", e)
-                // Try secondary category fallback without custom animation options if first attempt threw
-                try {
-                    val fallbackIntent = resolveCategoryFallbackIntent(context, packageName)
-                    if (fallbackIntent != null) {
-                        fallbackIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-                        context.startActivity(fallbackIntent)
-                        val elapsedMs = (System.nanoTime() - startTime) / 1_000_000
-                        _lastLaunchTimeMs.value = elapsedMs
-                        return true
-                    }
-                } catch (ex: Exception) {
-                    Log.e("LatencyManager", "Secondary launch attempt failed for $packageName", ex)
-                }
+                Log.e("LatencyManager", "Failed to launch $packageName", e)
                 fallbackAction?.invoke()
-                return false
+                false
             }
         } else {
             // Package is simulated (e.g. internal Piuu suite app) or not installed natively
             val elapsedMs = (System.nanoTime() - startTime) / 1_000_000
             _lastLaunchTimeMs.value = elapsedMs
             fallbackAction?.invoke()
-            return false
-        }
-    }
-
-    /**
-     * Resolves generic system intents (Dialer, Messaging, Camera, Settings, Browser, etc.)
-     * when a specific hardcoded package name is missing from the physical device.
-     */
-    private fun resolveCategoryFallbackIntent(context: Context, packageName: String): Intent? {
-        val lower = packageName.lowercase()
-
-        val intent: Intent? = when {
-            lower.contains("phone") || lower.contains("dialer") -> 
-                Intent(Intent.ACTION_DIAL)
-
-            lower.contains("mms") || lower.contains("message") || lower.contains("sms") -> 
-                Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MESSAGING)
-
-            lower.contains("camera") -> 
-                Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
-
-            lower.contains("settings") -> 
-                Intent(android.provider.Settings.ACTION_SETTINGS)
-
-            lower.contains("chrome") || lower.contains("browser") -> 
-                Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_BROWSER)
-
-            lower.contains("calc") -> 
-                Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALCULATOR)
-
-            lower.contains("calendar") -> 
-                Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR)
-
-            lower.contains("mail") || lower.contains("gmail") -> 
-                Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_EMAIL)
-
-            lower.contains("music") || lower.contains("spotify") -> 
-                Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MUSIC)
-
-            lower.contains("file") || lower.contains("documents") -> 
-                Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS)
-
-            lower.contains("clock") || lower.contains("alarm") -> 
-                Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)
-
-            lower.contains("weather") -> 
-                Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_WEATHER)
-
-            lower.contains("map") -> 
-                Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MAPS)
-
-            else -> null
-        }
-
-        return intent?.apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            false
         }
     }
 
