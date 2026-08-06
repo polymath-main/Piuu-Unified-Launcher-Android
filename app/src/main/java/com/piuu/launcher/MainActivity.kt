@@ -370,7 +370,8 @@ fun LauncherAppMain(
                     showDrawer = false
                     longPressedApp = app
                 },
-                onAutoCategorize = handleAutoCategorizeApps
+                onAutoCategorize = handleAutoCategorizeApps,
+                onOpenQuickSettings = { showQuickSettings = true }
             )
         }
 

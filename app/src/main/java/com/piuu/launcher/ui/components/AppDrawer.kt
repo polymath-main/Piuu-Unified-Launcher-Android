@@ -43,7 +43,8 @@ fun AppDrawer(
     onLaunchApp: (SystemApp) -> Unit,
     onToggleFavorite: (SystemApp) -> Unit,
     onLongPressApp: (SystemApp) -> Unit,
-    onAutoCategorize: (() -> Unit) -> Unit = {}
+    onAutoCategorize: (() -> Unit) -> Unit = {},
+    onOpenQuickSettings: () -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefManager = remember { LauncherPreferenceManager.getInstance(context) }
@@ -69,13 +70,37 @@ fun AppDrawer(
 
     val categories = listOf("all", "piuu_suite", "social", "productivity", "entertainment", "utilities", "system")
 
-    val filteredApps = apps.filter { app ->
+    val launcherSettingsApp = remember {
+        SystemApp(
+            name = "Launcher Settings",
+            package_name = "com.piuu.launcher.settings",
+            icon_name = "settings",
+            category = "system"
+        )
+    }
+
+    val combinedApps = remember(apps) {
+        if (apps.none { it.package_name == "com.piuu.launcher.settings" }) {
+            listOf(launcherSettingsApp) + apps
+        } else {
+            apps
+        }
+    }
+
+    val filteredApps = combinedApps.filter { app ->
         val matchesQuery = app.name.contains(searchQuery, ignoreCase = true) || app.package_name.contains(searchQuery, ignoreCase = true)
         val matchesCategory = if (selectedCategory == "all") true else app.category.equals(selectedCategory, ignoreCase = true)
         matchesQuery && matchesCategory
     }
 
-    val frequentApps = apps.sortedByDescending { it.usage_count }.take(4)
+    val handleAppClick: (SystemApp) -> Unit = { app ->
+        if (app.package_name == "com.piuu.launcher.settings") {
+            onDismiss()
+            onOpenQuickSettings()
+        } else {
+            onLaunchApp(app)
+        }
+    }
 
     // Reactive preference state triggers
     var prefVersion by remember { mutableIntStateOf(0) }
@@ -270,7 +295,7 @@ fun AppDrawer(
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.longPressPulseEffect(
-                                onClick = { onLaunchApp(app) },
+                                onClick = { handleAppClick(app) },
                                 onLongClick = { onLongPressApp(app) }
                             )
                         ) {
@@ -340,7 +365,7 @@ fun AppDrawer(
                                         app = app,
                                         iconSize = drawerIconSize,
                                         showLabels = drawerShowLabels,
-                                        onClick = { onLaunchApp(app) },
+                                        onClick = { handleAppClick(app) },
                                         onLongClick = { onLongPressApp(app) }
                                     )
                                 }
@@ -379,7 +404,7 @@ fun AppDrawer(
                             app = app,
                             iconSize = drawerIconSize,
                             showLabels = drawerShowLabels,
-                            onClick = { onLaunchApp(app) },
+                            onClick = { handleAppClick(app) },
                             onLongClick = { onLongPressApp(app) }
                         )
                     }
