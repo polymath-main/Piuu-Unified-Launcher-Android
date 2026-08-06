@@ -9,6 +9,8 @@ jobs:
   build:
     name: Build Native C Binary & Android APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout Repository
@@ -94,7 +96,7 @@ jobs:
         ls -la release_assets/
 
     - name: Publish GitHub Release Assets (Cloud Automated)
-      if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+      if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.0.0-release' }}
