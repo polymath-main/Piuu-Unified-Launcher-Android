@@ -13,6 +13,7 @@ import android.util.LruCache
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -27,17 +28,47 @@ import com.piuu.launcher.marketplace.MarketplaceCore
 import java.io.ByteArrayOutputStream
 import java.io.File
 
-class UniversalIconLoader(private val context: Context) {
+class UniversalIconLoader private constructor(private val context: Context) {
     private val preferenceManager = LauncherPreferenceManager.getInstance(context)
     private val iconPackManager = IconPackManager(context)
     private val pm = context.packageManager
 
-    // Memory cache for Base64 WebP strings (max 100 entries)
-    private val memoryCache = LruCache<String, String>(100)
+    // Fast in-memory ImageBitmap cache (holds up to 250 decoded icons for 60fps scrolling)
+    private val imageBitmapCache = LruCache<String, ImageBitmap>(250)
+
+    // Base64 WebP memory cache
+    private val base64Cache = LruCache<String, String>(150)
 
     // Disk cache directory
     private val diskCacheDir = File(context.cacheDir, "icon_disk_cache").apply {
         if (!exists()) mkdirs()
+    }
+
+    companion object {
+        @Volatile
+        private var instance: UniversalIconLoader? = null
+
+        fun getInstance(context: Context): UniversalIconLoader {
+            return instance ?: synchronized(this) {
+                instance ?: UniversalIconLoader(context.applicationContext).also { instance = it }
+            }
+        }
+    }
+
+    /**
+     * Synchronous fast-path memory cache lookup for 60fps Compose scrolling.
+     */
+    fun getCachedBitmap(packageName: String): ImageBitmap? {
+        return imageBitmapCache.get(packageName)
+    }
+
+    suspend fun loadIconBitmap(packageName: String): ImageBitmap? = withContext(Dispatchers.IO) {
+        imageBitmapCache.get(packageName)?.let { return@withContext it }
+
+        val bitmap = resolveBitmap(packageName, null) ?: return@withContext null
+        val imageBitmap = bitmap.asImageBitmap()
+        imageBitmapCache.put(packageName, imageBitmap)
+        return@withContext imageBitmap
     }
 
     private fun getActiveIconPackAndVersion(): Pair<String, String> {
@@ -49,7 +80,6 @@ class UniversalIconLoader(private val context: Context) {
                 return Pair("default", "1.0.0")
             }
 
-            // Look up version in installed plugins
             val marketplaceCore = MarketplaceCore.getInstance(context)
             val installedPlugins = marketplaceCore.installedPluginsFlow.value
             val plugin = installedPlugins.find { it.manifest.id.equals(activeIconPack, ignoreCase = true) }
@@ -57,7 +87,6 @@ class UniversalIconLoader(private val context: Context) {
                 return Pair(activeIconPack, plugin.manifest.version)
             }
 
-            // Look up in SchemeStore
             val schemeManager = SchemeManager.getInstance(context)
             val schemes = schemeManager.getSchemesForCategory("icons")
             val scheme = schemes.find { it.id.equals(activeIconPack, ignoreCase = true) }
@@ -72,7 +101,7 @@ class UniversalIconLoader(private val context: Context) {
         }
     }
 
-    private fun getDiskCachedIcon(packageName: String, activityName: String? = null, currentPack: String, currentVersion: String): String? {
+    private fun getDiskCachedIcon(packageName: String, activityName: String?, currentPack: String, currentVersion: String): String? {
         val sanitizedKey = "${packageName.replace(".", "_")}_${activityName?.replace(".", "_") ?: "main"}"
         val cacheFile = File(diskCacheDir, "${sanitizedKey}.cache")
         if (!cacheFile.exists()) return null
@@ -82,7 +111,7 @@ class UniversalIconLoader(private val context: Context) {
                 val cachedHeader = reader.readLine() ?: return null
                 val expectedHeader = "v1:${currentPack}:${currentVersion}"
                 if (cachedHeader == expectedHeader) {
-                    return reader.readText() // Read the rest of the file (Base64 WebP string)
+                    return reader.readText()
                 }
             }
         } catch (e: Exception) {
@@ -91,7 +120,7 @@ class UniversalIconLoader(private val context: Context) {
         return null
     }
 
-    private fun saveDiskCachedIcon(packageName: String, activityName: String? = null, currentPack: String, currentVersion: String, base64Str: String) {
+    private fun saveDiskCachedIcon(packageName: String, activityName: String?, currentPack: String, currentVersion: String, base64Str: String) {
         val sanitizedKey = "${packageName.replace(".", "_")}_${activityName?.replace(".", "_") ?: "main"}"
         val cacheFile = File(diskCacheDir, "${sanitizedKey}.cache")
         try {
@@ -106,19 +135,19 @@ class UniversalIconLoader(private val context: Context) {
 
     suspend fun resolveIcon(packageName: String, activityName: String? = null): String = withContext(Dispatchers.IO) {
         val cacheKey = "$packageName/$activityName"
-        memoryCache.get(cacheKey)?.let { return@withContext it }
+        base64Cache.get(cacheKey)?.let { return@withContext it }
 
         val (currentPack, currentVersion) = getActiveIconPackAndVersion()
         getDiskCachedIcon(packageName, activityName, currentPack, currentVersion)?.let { cachedBase64 ->
-            memoryCache.put(cacheKey, cachedBase64)
+            base64Cache.put(cacheKey, cachedBase64)
             return@withContext cachedBase64
         }
 
         val iconBitmap = resolveBitmap(packageName, activityName) ?: throw Exception("Icon not found for $packageName")
         val scaled = Bitmap.createScaledBitmap(iconBitmap, 128, 128, true)
-        if (scaled != iconBitmap && !iconBitmap.isRecycled) {
-            iconBitmap.recycle()
-        }
+        
+        // Cache ImageBitmap directly for Compose
+        imageBitmapCache.put(packageName, scaled.asImageBitmap())
 
         val outputStream = ByteArrayOutputStream()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -128,18 +157,14 @@ class UniversalIconLoader(private val context: Context) {
             scaled.compress(Bitmap.CompressFormat.WEBP, 80, outputStream)
         }
         val byteArray = outputStream.toByteArray()
-        if (!scaled.isRecycled) {
-            scaled.recycle()
-        }
 
         val base64Str = Base64.encodeToString(byteArray, Base64.NO_WRAP)
-        memoryCache.put(cacheKey, base64Str)
+        base64Cache.put(cacheKey, base64Str)
         saveDiskCachedIcon(packageName, activityName, currentPack, currentVersion, base64Str)
         base64Str
     }
 
     private fun resolveBitmap(packageName: String, activityName: String?): Bitmap? {
-        // Layer 1: Check Icon Pack
         try {
             val repository = LauncherRepository(context)
             val schema = repository.getSchema()
@@ -165,7 +190,6 @@ class UniversalIconLoader(private val context: Context) {
             }
         }
 
-        // Layer 2: Check Local Store (context.filesDir/custom_icons/{packageName}.webp)
         try {
             val customDir = File(context.filesDir, "custom_icons")
             val customFile = File(customDir, "$packageName.webp")
@@ -175,11 +199,8 @@ class UniversalIconLoader(private val context: Context) {
                     return localBitmap
                 }
             }
-        } catch (e: Exception) {
-            // Fallback to system if local read fails
-        }
+        } catch (e: Exception) {}
 
-        // Layer 3: Fallback to System
         return try {
             val drawable = pm.getApplicationIcon(packageName)
             drawableToBitmap(drawable)
@@ -208,197 +229,83 @@ fun AppIcon(
     packageName: String,
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
     iconBase64: String? = null,
-    shape: androidx.compose.ui.graphics.Shape = androidx.compose.foundation.shape.RoundedCornerShape(22),
+    shape: androidx.compose.ui.graphics.Shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
     fallbackIconName: String = "apps",
     tintColor: androidx.compose.ui.graphics.Color? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val iconLoader = remember { UniversalIconLoader(context) }
-    val repository = remember { LauncherRepository(context) }
-    val schema = repository.getSchema()
-    val activeIconPack = schema.active_icon_pack.lowercase()
+    val iconLoader = remember { UniversalIconLoader.getInstance(context) }
     val prefManager = remember { LauncherPreferenceManager.getInstance(context) }
     
     val chosenShape = remember(prefManager.adaptiveIconShape) {
         when (prefManager.adaptiveIconShape.uppercase()) {
             "CIRCLE" -> androidx.compose.foundation.shape.CircleShape
-            "SQUIRCLE" -> androidx.compose.foundation.shape.RoundedCornerShape(32)
+            "SQUIRCLE" -> androidx.compose.foundation.shape.RoundedCornerShape(24)
             "TEARDROP" -> androidx.compose.foundation.shape.RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 4.dp)
-            "ROUNDED_RECT" -> androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
-            else -> androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            "ROUNDED_RECT" -> androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+            else -> androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
         }
     }
+
+    // Fast-path memory cache lookup
+    val cachedBitmap = remember(packageName) { iconLoader.getCachedBitmap(packageName) }
     
-    val iconBitmapState = androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(
-        initialValue = null, 
+    val iconBitmapState = androidx.compose.runtime.produceState<ImageBitmap?>(
+        initialValue = cachedBitmap, 
         key1 = packageName, 
-        key2 = iconBase64,
-        key3 = activeIconPack
+        key2 = iconBase64
     ) {
-        try {
-            val rawBase64 = if (!iconBase64.isNullOrEmpty()) {
-                if (iconBase64.contains(",")) iconBase64.substringAfter(",") else iconBase64
-            } else {
-                iconLoader.resolveIcon(packageName)
+        if (cachedBitmap != null) {
+            value = cachedBitmap
+        } else {
+            val loaded = iconLoader.loadIconBitmap(packageName)
+            if (loaded != null) {
+                value = loaded
+            } else if (!iconBase64.isNullOrEmpty()) {
+                try {
+                    val rawBase64 = if (iconBase64.contains(",")) iconBase64.substringAfter(",") else iconBase64
+                    val decodedBytes = Base64.decode(rawBase64, Base64.DEFAULT)
+                    val bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+                    value = bitmap?.asImageBitmap()
+                } catch (_: Exception) {}
             }
-            if (rawBase64.length > 20) {
-                val decodedBytes = Base64.decode(rawBase64, Base64.DEFAULT)
-                val bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-                value = bitmap?.asImageBitmap()
-            }
-        } catch (_: Exception) {}
+        }
     }
 
     val bitmap = iconBitmapState.value
-    val isThemed = activeIconPack != "default" && activeIconPack.isNotEmpty()
 
-    if (isThemed) {
-        val packShape = when {
-            activeIconPack.contains("pixel") -> androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
-            activeIconPack.contains("pastel") -> androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
-            activeIconPack.contains("monochrome") || activeIconPack.contains("neon") || activeIconPack.contains("gold") -> androidx.compose.foundation.shape.CircleShape
-            else -> chosenShape
-        }
-
-        val packModifier = modifier
-            .size(48.dp)
-            .clip(packShape)
-            .then(
-                when {
-                    activeIconPack.contains("neon") -> {
-                        androidx.compose.ui.Modifier
-                            .background(androidx.compose.ui.graphics.Color(0xFF0F172A))
-                            .border(1.5.dp, androidx.compose.ui.graphics.Color(0xFF06B6D4), packShape)
-                    }
-                    activeIconPack.contains("pastel") -> {
-                        val pastelColors = listOf(
-                            androidx.compose.ui.graphics.Color(0xFFFDE2E4),
-                            androidx.compose.ui.graphics.Color(0xFFFFCAD4),
-                            androidx.compose.ui.graphics.Color(0xFFB5E2FA),
-                            androidx.compose.ui.graphics.Color(0xFFE2F0D9),
-                            androidx.compose.ui.graphics.Color(0xFFE8F0FE),
-                            androidx.compose.ui.graphics.Color(0xFFF0E6FF)
-                        )
-                        val idx = Math.abs(packageName.hashCode()) % pastelColors.size
-                        androidx.compose.ui.Modifier.background(pastelColors[idx])
-                    }
-                    activeIconPack.contains("monochrome") || activeIconPack.contains("wireframe") -> {
-                        androidx.compose.ui.Modifier
-                            .background(androidx.compose.ui.graphics.Color(0xFF09090B))
-                            .border(1.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f), packShape)
-                    }
-                    activeIconPack.contains("pixel") -> {
-                        androidx.compose.ui.Modifier
-                            .background(androidx.compose.ui.graphics.Color(0xFFEF4444))
-                            .border(2.dp, androidx.compose.ui.graphics.Color.Black, packShape)
-                    }
-                    activeIconPack.contains("gold") -> {
-                        androidx.compose.ui.Modifier.background(
-                            androidx.compose.ui.graphics.Brush.linearGradient(
-                                listOf(androidx.compose.ui.graphics.Color(0xFFFCD34D), androidx.compose.ui.graphics.Color(0xFFD97706))
-                            )
-                        )
-                    }
-                    activeIconPack.contains("vintage") -> {
-                        androidx.compose.ui.Modifier
-                            .background(androidx.compose.ui.graphics.Color(0xFFF5E6CA))
-                            .border(1.dp, androidx.compose.ui.graphics.Color(0xFFD4B499), packShape)
-                    }
-                    activeIconPack.contains("material") -> {
-                        androidx.compose.ui.Modifier
-                            .background(com.piuu.launcher.ui.theme.activePrimaryColor.copy(alpha = 0.2f))
-                            .border(1.dp, com.piuu.launcher.ui.theme.activePrimaryColor, packShape)
-                    }
-                    else -> androidx.compose.ui.Modifier
-                }
-            )
-
-        androidx.compose.foundation.layout.Box(
-            modifier = packModifier,
-            contentAlignment = androidx.compose.ui.Alignment.Center
-        ) {
-            val tint = when {
-                activeIconPack.contains("neon") -> androidx.compose.ui.graphics.Color(0xFF06B6D4)
-                activeIconPack.contains("pastel") -> androidx.compose.ui.graphics.Color(0xFF475569)
-                activeIconPack.contains("monochrome") || activeIconPack.contains("wireframe") -> androidx.compose.ui.graphics.Color.White
-                activeIconPack.contains("pixel") -> androidx.compose.ui.graphics.Color.Black
-                activeIconPack.contains("gold") -> androidx.compose.ui.graphics.Color(0xFF451A03)
-                activeIconPack.contains("vintage") -> androidx.compose.ui.graphics.Color(0xFF5C3D2E)
-                activeIconPack.contains("material") -> com.piuu.launcher.ui.theme.activePrimaryColor
-                else -> tintColor
-            }
-
-            if (bitmap != null) {
-                androidx.compose.foundation.Image(
-                    bitmap = bitmap,
-                    contentDescription = null,
-                    modifier = androidx.compose.ui.Modifier
-                        .size(24.dp)
-                        .clip(packShape),
-                    colorFilter = if (tint != null) androidx.compose.ui.graphics.ColorFilter.tint(tint) else null
-                )
-            } else {
-                androidx.compose.material3.Icon(
-                    imageVector = when(fallbackIconName) {
-                        "phone" -> androidx.compose.material.icons.Icons.Default.Phone
-                        "message" -> androidx.compose.material.icons.Icons.Default.Message
-                        "globe" -> androidx.compose.material.icons.Icons.Default.Public
-                        "camera" -> androidx.compose.material.icons.Icons.Default.CameraAlt
-                        "brain" -> androidx.compose.material.icons.Icons.Default.AutoAwesome
-                        "folder" -> androidx.compose.material.icons.Icons.Default.Folder
-                        "code" -> androidx.compose.material.icons.Icons.Default.Code
-                        "music" -> androidx.compose.material.icons.Icons.Default.MusicNote
-                        "mail" -> androidx.compose.material.icons.Icons.Default.Mail
-                        "video" -> androidx.compose.material.icons.Icons.Default.PlayCircle
-                        "calendar" -> androidx.compose.material.icons.Icons.Default.CalendarToday
-                        "settings" -> androidx.compose.material.icons.Icons.Default.Settings
-                        "note" -> androidx.compose.material.icons.Icons.Default.EditNote
-                        "calculator" -> androidx.compose.material.icons.Icons.Default.Calculate
-                        "cloud" -> androidx.compose.material.icons.Icons.Default.Cloud
-                        "file" -> androidx.compose.material.icons.Icons.Default.InsertDriveFile
-                        "clock" -> androidx.compose.material.icons.Icons.Default.AccessTime
-                        else -> androidx.compose.material.icons.Icons.Default.Apps
-                    },
-                    contentDescription = null,
-                    tint = tint ?: androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                    modifier = androidx.compose.ui.Modifier.size(24.dp)
-                )
-            }
-        }
+    if (bitmap != null) {
+        androidx.compose.foundation.Image(
+            bitmap = bitmap,
+            contentDescription = null,
+            modifier = modifier.clip(chosenShape)
+        )
     } else {
-        if (bitmap != null) {
-            androidx.compose.foundation.Image(
-                bitmap = bitmap,
-                contentDescription = null,
-                modifier = modifier.clip(chosenShape)
-            )
-        } else {
-            androidx.compose.material3.Icon(
-                imageVector = when(fallbackIconName) {
-                    "phone" -> androidx.compose.material.icons.Icons.Default.Phone
-                    "message" -> androidx.compose.material.icons.Icons.Default.Message
-                    "globe" -> androidx.compose.material.icons.Icons.Default.Public
-                    "camera" -> androidx.compose.material.icons.Icons.Default.CameraAlt
-                    "brain" -> androidx.compose.material.icons.Icons.Default.AutoAwesome
-                    "folder" -> androidx.compose.material.icons.Icons.Default.Folder
-                    "code" -> androidx.compose.material.icons.Icons.Default.Code
-                    "music" -> androidx.compose.material.icons.Icons.Default.MusicNote
-                    "mail" -> androidx.compose.material.icons.Icons.Default.Mail
-                    "video" -> androidx.compose.material.icons.Icons.Default.PlayCircle
-                    "calendar" -> androidx.compose.material.icons.Icons.Default.CalendarToday
-                    "settings" -> androidx.compose.material.icons.Icons.Default.Settings
-                    "note" -> androidx.compose.material.icons.Icons.Default.EditNote
-                    "calculator" -> androidx.compose.material.icons.Icons.Default.Calculate
-                    "cloud" -> androidx.compose.material.icons.Icons.Default.Cloud
-                    "file" -> androidx.compose.material.icons.Icons.Default.InsertDriveFile
-                    "clock" -> androidx.compose.material.icons.Icons.Default.AccessTime
-                    else -> androidx.compose.material.icons.Icons.Default.Apps
-                },
-                contentDescription = null,
-                tint = tintColor ?: androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                modifier = modifier
-            )
-        }
+        androidx.compose.material3.Icon(
+            imageVector = when(fallbackIconName) {
+                "phone" -> androidx.compose.material.icons.Icons.Default.Phone
+                "message" -> androidx.compose.material.icons.Icons.Default.Message
+                "globe" -> androidx.compose.material.icons.Icons.Default.Public
+                "camera" -> androidx.compose.material.icons.Icons.Default.CameraAlt
+                "brain" -> androidx.compose.material.icons.Icons.Default.AutoAwesome
+                "folder" -> androidx.compose.material.icons.Icons.Default.Folder
+                "code" -> androidx.compose.material.icons.Icons.Default.Code
+                "music" -> androidx.compose.material.icons.Icons.Default.MusicNote
+                "mail" -> androidx.compose.material.icons.Icons.Default.Mail
+                "video" -> androidx.compose.material.icons.Icons.Default.PlayCircle
+                "calendar" -> androidx.compose.material.icons.Icons.Default.CalendarToday
+                "settings" -> androidx.compose.material.icons.Icons.Default.Settings
+                "note" -> androidx.compose.material.icons.Icons.Default.EditNote
+                "calculator" -> androidx.compose.material.icons.Icons.Default.Calculate
+                "cloud" -> androidx.compose.material.icons.Icons.Default.Cloud
+                "file" -> androidx.compose.material.icons.Icons.Default.InsertDriveFile
+                "clock" -> androidx.compose.material.icons.Icons.Default.AccessTime
+                else -> androidx.compose.material.icons.Icons.Default.Apps
+            },
+            contentDescription = null,
+            tint = tintColor ?: com.piuu.launcher.ui.theme.PrimaryBlue,
+            modifier = modifier
+        )
     }
 }
 
@@ -416,5 +323,3 @@ fun AppIconImage(
         tintColor = tintColor
     )
 }
-
-

@@ -6,8 +6,8 @@ import android.webkit.WebView
 import org.json.JSONObject
 
 data class LauncherConfig(
-    val homeIconSize: Int = 56,
-    val drawerIconSize: Int = 52,
+    val homeIconSize: Int = 58,
+    val drawerIconSize: Int = 58,
     val drawerOrientation: String = "vertical", // "vertical" | "horizontal"
     val homeColumns: Int = 4,
     val homeRows: Int = 6,
@@ -21,8 +21,8 @@ class LauncherConfigManager(private val context: Context) {
 
     var config: LauncherConfig
         get() = LauncherConfig(
-            homeIconSize = prefs.getInt("home_icon_size", 56),
-            drawerIconSize = prefs.getInt("drawer_icon_size", 52),
+            homeIconSize = prefs.getInt("home_icon_size", 58),
+            drawerIconSize = prefs.getInt("drawer_icon_size", 58),
             drawerOrientation = prefs.getString("drawer_orientation", "vertical") ?: "vertical",
             homeColumns = prefs.getInt("home_columns", 4),
             homeRows = prefs.getInt("home_rows", 6),

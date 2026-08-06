@@ -410,15 +410,16 @@ fun AppGridTileItem(
         ) {
             Box(
                 modifier = Modifier
-                    .size(iconSize.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .size((iconSize + 4).dp)
+                    .clip(RoundedCornerShape(18.dp))
                     .background(CardGlassBg)
-                    .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp)),
+                    .border(1.dp, LauncherBorder.copy(alpha = 0.6f), RoundedCornerShape(18.dp))
+                    .padding(4.dp),
                 contentAlignment = Alignment.Center
             ) {
                 AppIconImage(
                     packageName = app.package_name,
-                    modifier = Modifier.size((iconSize * 0.48f).dp),
+                    modifier = Modifier.size((iconSize * 0.85f).dp),
                     fallbackIconName = app.icon_name,
                     tintColor = if (app.category == "piuu_suite") SuccessGreen else PrimaryBlue
                 )
