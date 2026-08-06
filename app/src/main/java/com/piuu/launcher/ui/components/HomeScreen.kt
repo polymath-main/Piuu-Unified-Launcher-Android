@@ -644,6 +644,7 @@ fun HomeScreen(
                             border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder)
                         ) {
                             Text("Close", color = TextPrimary)
+                        }
                     }
                 }
             }
