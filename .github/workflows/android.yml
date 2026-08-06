@@ -28,12 +28,12 @@ jobs:
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1" "build-tools;34.0.0"
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
 
-    - name: Set up Gradle 8.7 (Cache Disabled)
+    - name: Set up Gradle 8.7 (Cache Enabled)
       uses: gradle/actions/setup-gradle@v4
       with:
         gradle-version: 8.7
         validate-wrappers: false
-        cache-disabled: true
+        cache-disabled: false
 
     - name: Restore Debug Keystore
       env:
@@ -51,10 +51,10 @@ jobs:
           keytool -genkeypair -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
         fi
 
-    - name: Build Native C Core Library & APKs (Clean Build)
+    - name: Build Native C Core Library & APKs (Fast Cached UI Build)
       run: |
         chmod +x gradlew 2>/devnull || true
-        gradle clean assembleDebug assembleRelease --no-daemon
+        ./gradlew assembleDebug assembleRelease
 
     - name: Upload Debug & Release APK Artifacts
       uses: actions/upload-artifact@v4

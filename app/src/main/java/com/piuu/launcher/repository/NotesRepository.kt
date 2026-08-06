@@ -1,4 +1,4 @@
-package com.piuu/launcher/repository
+package com.piuu.launcher.repository
 
 import android.content.Context
 import android.content.SharedPreferences
