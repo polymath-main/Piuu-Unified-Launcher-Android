@@ -93,6 +93,7 @@ fun HomeScreen(
     var showActionChooserForElement by remember { mutableStateOf<LauncherElement?>(null) }
     var showHomescreenOptions by remember { mutableStateOf(false) }
     var showWidgetsDashboard by remember { mutableStateOf(false) }
+    var showAppShortcutPicker by remember { mutableStateOf(false) }
 
     val elementBounds = remember { mutableStateMapOf<String, androidx.compose.ui.geometry.Rect>() }
     var draggedElement by remember { mutableStateOf<LauncherElement?>(null) }
@@ -324,7 +325,22 @@ fun HomeScreen(
                         ) {
                             Icon(imageVector = Icons.Default.Widgets, contentDescription = null, tint = Color.White)
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text("System Widget Picker", fontWeight = FontWeight.Bold)
+                            Text("🧩 Add Widgets (Built-in / System)", fontWeight = FontWeight.Bold)
+                        }
+
+                        // 2. Pin App Icon to Homescreen
+                        Button(
+                            onClick = {
+                                showHomescreenOptions = false
+                                showAppShortcutPicker = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.AddReaction, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("📱 Pin App Icon to Homescreen", fontWeight = FontWeight.Bold)
                         }
 
                         // 2. Gemini AI Assistant Launch
@@ -628,6 +644,98 @@ fun HomeScreen(
                             border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder)
                         ) {
                             Text("Close", color = TextPrimary)
+                    }
+                }
+            }
+        }
+
+        // App Shortcut Picker Dialog (Pin App Icon to Homescreen)
+        if (showAppShortcutPicker) {
+            Dialog(onDismissRequest = { showAppShortcutPicker = false }) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = CardGlassBg.copy(alpha = 0.98f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder),
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.8f)
+                ) {
+                    var appSearchQuery by remember { mutableStateOf("") }
+                    val filteredShortcutApps = remember(appSearchQuery, installedApps) {
+                        installedApps.filter { it.name.contains(appSearchQuery, ignoreCase = true) }
+                    }
+
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(
+                            text = "📱 Pin App Icon to Homescreen",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = appSearchQuery,
+                            onValueChange = { appSearchQuery = it },
+                            placeholder = { Text("Search installed apps...", color = TextMuted) },
+                            leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = PrimaryBlue) },
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(filteredShortcutApps.size) { idx ->
+                                val app = filteredShortcutApps[idx]
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(LauncherGlass)
+                                        .clickable {
+                                            val currentPageIndex = pagerState.currentPage
+                                            val targetPage = pages.getOrNull(currentPageIndex)
+                                            if (targetPage != null) {
+                                                val newElem = LauncherElement(
+                                                    element_id = "app_${app.package_name}_${java.util.UUID.randomUUID().toString().take(5)}",
+                                                    type = ElementType.APP_GRID,
+                                                    title = app.name,
+                                                    action_intent = ActionIntent(type = "launch_app", target = app.package_name),
+                                                    style_props = StyleProps(w = 1, h = 1, borderRadius = 20)
+                                                )
+                                                val updatedElements = targetPage.elements + newElem
+                                                val updatedPages = pages.mapIndexed { i, p ->
+                                                    if (i == currentPageIndex) p.copy(elements = updatedElements) else p
+                                                }
+                                                onSaveSchema(schema.copy(pages = updatedPages))
+                                                Toast.makeText(context, "Pinned '${app.name}' to homescreen!", Toast.LENGTH_SHORT).show()
+                                                showAppShortcutPicker = false
+                                            }
+                                        }
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    com.piuu.launcher.repository.AppIconImage(
+                                        packageName = app.package_name,
+                                        modifier = Modifier.size(36.dp),
+                                        fallbackIconName = app.icon_name,
+                                        tintColor = PrimaryBlue
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(text = app.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = { showAppShortcutPicker = false },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder)
+                        ) {
+                            Text("Cancel", color = TextPrimary)
                         }
                     }
                 }
@@ -678,16 +786,26 @@ fun HomeScreen(
 
                         Button(
                             onClick = {
-                                onLongPressElement(elem)
+                                val currentPageIndex = pagerState.currentPage
+                                val targetPage = pages.getOrNull(currentPageIndex)
+                                if (targetPage != null) {
+                                    val updatedElements = targetPage.elements.filterNot { it.element_id == elem.element_id }
+                                    val updatedPages = pages.mapIndexed { idx, p ->
+                                        if (idx == currentPageIndex) p.copy(elements = updatedElements) else p
+                                    }
+                                    onSaveSchema(schema.copy(pages = updatedPages))
+                                    Toast.makeText(context, "Removed '${elem.title ?: "Element"}' from homescreen", Toast.LENGTH_SHORT).show()
+                                }
                                 showActionChooserForElement = null
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x1AFFFFFF)),
+                            colors = ButtonDefaults.buttonColors(containerColor = DangerRed.copy(alpha = 0.2f), contentColor = DangerRed),
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, DangerRed.copy(alpha = 0.6f))
                         ) {
-                            Icon(imageVector = Icons.Default.Palette, contentDescription = null, tint = TextPrimary)
+                            Icon(imageVector = Icons.Default.Delete, contentDescription = null, tint = DangerRed)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("🎨 Customize Appearance", color = TextPrimary, fontWeight = FontWeight.Bold)
+                            Text("🗑️ Remove from Homescreen", color = DangerRed, fontWeight = FontWeight.Bold)
                         }
 
                         OutlinedButton(
@@ -1110,125 +1228,118 @@ fun HomeScreen(
 
                             // RESIZING HANDLES (overlay if isResizingThis is true)
                             if (isResizingThis) {
-                                // Dim/Tint overlay
+                                val defaultW = when (elem.type) {
+                                    ElementType.CLOCK, ElementType.WEATHER, ElementType.AGENT_WIDGET, ElementType.MEDIA_PLAYER, ElementType.PIUU_SUITE_FOLDER, ElementType.NOTIFICATION_CENTER, ElementType.CUSTOM_CARD -> 4
+                                    else -> 2
+                                }
+                                val currentW = elem.style_props.w ?: defaultW
+                                val currentH = elem.style_props.h ?: 2
+
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Color.Black.copy(alpha = 0.05f))
+                                        .background(Color.Black.copy(alpha = 0.25f))
                                 )
 
-                                // Width Handle (Right edge button to toggle 1-col / 2-col span)
-                                Box(
+                                Column(
                                     modifier = Modifier
-                                        .align(Alignment.CenterEnd)
-                                        .padding(end = 8.dp)
+                                        .fillMaxSize()
+                                        .padding(6.dp),
+                                    verticalArrangement = Arrangement.SpaceBetween,
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    IconButton(
-                                        onClick = {
-                                            val currentW = elem.style_props.w ?: 2
-                                            val newW = if (currentW >= 3) 2 else 4
-                                            val updatedProps = elem.style_props.copy(w = newW)
-                                            val updatedElem = elem.copy(style_props = updatedProps)
-                                            val updatedPages = pages.map { page ->
-                                                val updatedElements = page.elements.map { e ->
-                                                    if (e.element_id == elem.element_id) updatedElem else e
-                                                }
-                                                page.copy(elements = updatedElements)
-                                            }
-                                            onSaveSchema(schema.copy(pages = updatedPages))
-                                        },
-                                        colors = IconButtonDefaults.iconButtonColors(
-                                            containerColor = borderAccent,
-                                            contentColor = Color.White
-                                        ),
-                                        modifier = Modifier.size(36.dp)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End
                                     ) {
-                                        Icon(
-                                            imageVector = if ((elem.style_props.w ?: 2) >= 3) Icons.Default.KeyboardArrowLeft else Icons.Default.KeyboardArrowRight,
-                                            contentDescription = "Resize Width",
-                                            modifier = Modifier.size(20.dp)
-                                        )
+                                        IconButton(
+                                            onClick = { activeResizingElementId = null },
+                                            colors = IconButtonDefaults.iconButtonColors(containerColor = PrimaryBlue, contentColor = Color.White),
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(imageVector = Icons.Default.Check, contentDescription = "Done", modifier = Modifier.size(16.dp))
+                                        }
                                     }
-                                }
 
-                                // Height handles row at the bottom edge
-                                Row(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomCenter)
-                                        .padding(bottom = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    val currentH = elem.style_props.h ?: 2
-                                    IconButton(
-                                        onClick = {
-                                            if (currentH > 1) {
-                                                val newH = currentH - 1
-                                                val updatedProps = elem.style_props.copy(h = newH)
-                                                val updatedElem = elem.copy(style_props = updatedProps)
-                                                val updatedPages = pages.map { page ->
-                                                    val updatedElements = page.elements.map { e ->
-                                                        if (e.element_id == elem.element_id) updatedElem else e
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(Color.Black.copy(alpha = 0.7f))
+                                                .padding(2.dp)
+                                        ) {
+                                            IconButton(
+                                                onClick = {
+                                                    if (currentW > 1) {
+                                                        val newW = currentW - 1
+                                                        val updatedProps = elem.style_props.copy(w = newW)
+                                                        val updatedPages = pages.map { p -> p.copy(elements = p.elements.map { if (it.element_id == elem.element_id) elem.copy(style_props = updatedProps) else it }) }
+                                                        onSaveSchema(schema.copy(pages = updatedPages))
                                                     }
-                                                    page.copy(elements = updatedElements)
-                                                }
-                                                onSaveSchema(schema.copy(pages = updatedPages))
+                                                },
+                                                enabled = currentW > 1,
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(imageVector = Icons.Default.Remove, contentDescription = "W-", tint = Color.White, modifier = Modifier.size(14.dp))
                                             }
-                                        },
-                                        enabled = currentH > 1,
-                                        colors = IconButtonDefaults.iconButtonColors(
-                                            containerColor = if (currentH > 1) borderAccent else Color(0x33FFFFFF),
-                                            contentColor = Color.White
-                                        ),
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.KeyboardArrowUp,
-                                            contentDescription = "Reduce Height",
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-
-                                    Box(
-                                        modifier = Modifier
-                                            .background(borderAccent.copy(alpha = 0.85f), RoundedCornerShape(8.dp))
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) {
-                                        Text(
-                                            text = "H: $currentH",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                    }
-
-                                    IconButton(
-                                        onClick = {
-                                            if (currentH < 4) {
-                                                val newH = currentH + 1
-                                                val updatedProps = elem.style_props.copy(h = newH)
-                                                val updatedElem = elem.copy(style_props = updatedProps)
-                                                val updatedPages = pages.map { page ->
-                                                    val updatedElements = page.elements.map { e ->
-                                                        if (e.element_id == elem.element_id) updatedElem else e
+                                            Text("W:$currentW", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 2.dp))
+                                            IconButton(
+                                                onClick = {
+                                                    if (currentW < 4) {
+                                                        val newW = currentW + 1
+                                                        val updatedProps = elem.style_props.copy(w = newW)
+                                                        val updatedPages = pages.map { p -> p.copy(elements = p.elements.map { if (it.element_id == elem.element_id) elem.copy(style_props = updatedProps) else it }) }
+                                                        onSaveSchema(schema.copy(pages = updatedPages))
                                                     }
-                                                    page.copy(elements = updatedElements)
-                                                }
-                                                onSaveSchema(schema.copy(pages = updatedPages))
+                                                },
+                                                enabled = currentW < 4,
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(imageVector = Icons.Default.Add, contentDescription = "W+", tint = Color.White, modifier = Modifier.size(14.dp))
                                             }
-                                        },
-                                        enabled = currentH < 4,
-                                        colors = IconButtonDefaults.iconButtonColors(
-                                            containerColor = if (currentH < 4) borderAccent else Color(0x33FFFFFF),
-                                            contentColor = Color.White
-                                        ),
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.KeyboardArrowDown,
-                                            contentDescription = "Increase Height",
-                                            modifier = Modifier.size(18.dp)
-                                        )
+                                        }
+
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(Color.Black.copy(alpha = 0.7f))
+                                                .padding(2.dp)
+                                        ) {
+                                            IconButton(
+                                                onClick = {
+                                                    if (currentH > 1) {
+                                                        val newH = currentH - 1
+                                                        val updatedProps = elem.style_props.copy(h = newH)
+                                                        val updatedPages = pages.map { p -> p.copy(elements = p.elements.map { if (it.element_id == elem.element_id) elem.copy(style_props = updatedProps) else it }) }
+                                                        onSaveSchema(schema.copy(pages = updatedPages))
+                                                    }
+                                                },
+                                                enabled = currentH > 1,
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(imageVector = Icons.Default.Remove, contentDescription = "H-", tint = Color.White, modifier = Modifier.size(14.dp))
+                                            }
+                                            Text("H:$currentH", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 2.dp))
+                                            IconButton(
+                                                onClick = {
+                                                    if (currentH < 4) {
+                                                        val newH = currentH + 1
+                                                        val updatedProps = elem.style_props.copy(h = newH)
+                                                        val updatedPages = pages.map { p -> p.copy(elements = p.elements.map { if (it.element_id == elem.element_id) elem.copy(style_props = updatedProps) else it }) }
+                                                        onSaveSchema(schema.copy(pages = updatedPages))
+                                                    }
+                                                },
+                                                enabled = currentH < 4,
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(imageVector = Icons.Default.Add, contentDescription = "H+", tint = Color.White, modifier = Modifier.size(14.dp))
+                                            }
+                                        }
                                     }
                                 }
                             }
