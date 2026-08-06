@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # ==============================================================================
 # Piuu Unified Launcher — Automated Versioned Release Downloader
 # ==============================================================================
@@ -6,7 +6,7 @@
 # If TAG_NAME is omitted, automatically resolves and downloads the latest release.
 # ==============================================================================
 
-set -eo pipefail
+set -e
 
 REPO="polymath-main/Piuu-Unified-Launcher-Android"
 OUTPUT_DIR="downloads"
