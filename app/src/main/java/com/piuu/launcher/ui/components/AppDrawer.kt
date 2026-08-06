@@ -75,7 +75,8 @@ fun AppDrawer(
             name = "Launcher Settings",
             package_name = "com.piuu.launcher.settings",
             icon_name = "settings",
-            category = "system"
+            category = "system",
+            launch_intent = "com.piuu.launcher.SETTINGS"
         )
     }
 
@@ -291,7 +292,7 @@ fun AppDrawer(
                 Text("Smart Usage", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    items(items = frequentApps, key = { it.package_name }) { app ->
+                    items(frequentApps, key = { app -> app.package_name }) { app ->
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.longPressPulseEffect(
