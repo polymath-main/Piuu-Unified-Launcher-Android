@@ -289,7 +289,21 @@ class FloatingOverlayService : Service() {
         }
     }
 
-    private fun Int.dp.toPx(context: Context): Int = (this * context.resources.displayMetrics.density).toInt()
+    companion object {
+        fun start(context: Context) {
+            val intent = Intent(context, FloatingOverlayService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        fun stop(context: Context) {
+            val intent = Intent(context, FloatingOverlayService::class.java)
+            context.stopService(intent)
+        }
+    }
 }
 
 @Composable
