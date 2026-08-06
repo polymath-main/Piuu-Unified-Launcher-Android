@@ -1,0 +1,29 @@
+{
+  "name": "piuu-studio-desktop",
+  "version": "1.0.0",
+  "description": "Piuu Launcher Desktop Extension & Marketplace Product Studio (Electron + Node.js + React)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "pack-bundle": "node compiler/bundle-cli.js"
+  },
+  "keywords": [
+    "piuu-launcher",
+    "electron",
+    "extension-builder",
+    "marketplace-studio",
+    "android-widgets"
+  ],
+  "author": "Polymath Core Team <devilwarfaze@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "archiver": "^6.0.1",
+    "express": "^4.19.2",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}

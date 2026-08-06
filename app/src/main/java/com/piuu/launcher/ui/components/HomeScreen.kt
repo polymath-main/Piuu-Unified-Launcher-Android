@@ -94,6 +94,7 @@ fun HomeScreen(
     var showHomescreenOptions by remember { mutableStateOf(false) }
     var showWidgetsDashboard by remember { mutableStateOf(false) }
     var showAppShortcutPicker by remember { mutableStateOf(false) }
+    var showPresetThemeSwitcher by remember { mutableStateOf(false) }
 
     val elementBounds = remember { mutableStateMapOf<String, androidx.compose.ui.geometry.Rect>() }
     var draggedElement by remember { mutableStateOf<LauncherElement?>(null) }
@@ -374,7 +375,22 @@ fun HomeScreen(
                             Text("Open App Drawer", color = TextPrimary, fontWeight = FontWeight.SemiBold)
                         }
 
-                        // 4. Wallpaper Dynamic Palette Extraction
+                        // 4. 1-Tap Theme Transformer Studio
+                        Button(
+                            onClick = {
+                                showHomescreenOptions = false
+                                showPresetThemeSwitcher = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentPurple),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Brush, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("🎨 1-Tap Theme Transformer Studio", fontWeight = FontWeight.Bold)
+                        }
+
+                        // 5. Wallpaper Dynamic Palette Extraction
                         Button(
                             onClick = {
                                 showHomescreenOptions = false
@@ -732,6 +748,148 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                         OutlinedButton(
                             onClick = { showAppShortcutPicker = false },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder)
+                        ) {
+                            Text("Cancel", color = TextPrimary)
+                        }
+                    }
+                }
+            }
+        }
+
+        // 1-Tap Theme Transformer Studio Dialog
+        if (showPresetThemeSwitcher) {
+            Dialog(onDismissRequest = { showPresetThemeSwitcher = false }) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = CardGlassBg.copy(alpha = 0.98f),
+                    border = androidx.compose.foundation.BorderStroke(1.2.dp, LauncherBorder),
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(20.dp)
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "🎨 1-Tap Theme Transformer",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "Instantly re-skin all homescreen cards, app drawer backgrounds, icons, and floating PIP overlays with high-contrast preset combinations.",
+                            fontSize = 11.sp,
+                            color = TextSecondary,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Preset 1: Cyberpunk Neon
+                        Button(
+                            onClick = {
+                                val updatedTheme = schema.theme.copy(
+                                    id = "cyberpunk_neon",
+                                    name = "Cyberpunk Neon 2088",
+                                    primary_color = "#06B6D4",
+                                    accent_color = "#EC4899",
+                                    bg_overlay = "#0F172A",
+                                    card_glass = "#1E293B",
+                                    font_family = "Outfit"
+                                )
+                                onSaveSchema(schema.copy(theme = updatedTheme))
+                                Toast.makeText(context, "Applied Cyberpunk Neon 2088 Theme!", Toast.LENGTH_SHORT).show()
+                                showPresetThemeSwitcher = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F172A)),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF06B6D4))
+                        ) {
+                            Text("⚡ Cyberpunk Neon (Cyan & Pink)", color = Color(0xFF06B6D4), fontWeight = FontWeight.Bold)
+                        }
+
+                        // Preset 2: Minimalist OLED
+                        Button(
+                            onClick = {
+                                val updatedTheme = schema.theme.copy(
+                                    id = "minimalist_oled",
+                                    name = "Minimalist Pure OLED",
+                                    primary_color = "#FFFFFF",
+                                    accent_color = "#64748B",
+                                    bg_overlay = "#000000",
+                                    card_glass = "#111111",
+                                    font_family = "Inter"
+                                )
+                                onSaveSchema(schema.copy(theme = updatedTheme))
+                                Toast.makeText(context, "Applied Minimalist OLED Theme!", Toast.LENGTH_SHORT).show()
+                                showPresetThemeSwitcher = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White)
+                        ) {
+                            Text("🖤 Minimalist OLED (Pure Black)", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+
+                        // Preset 3: Pastel Squircle
+                        Button(
+                            onClick = {
+                                val updatedTheme = schema.theme.copy(
+                                    id = "pastel_squircle",
+                                    name = "Pastel Dream",
+                                    primary_color = "#8B5CF6",
+                                    accent_color = "#F43F5E",
+                                    bg_overlay = "#1E1B4B",
+                                    card_glass = "#312E81",
+                                    font_family = "Outfit"
+                                )
+                                onSaveSchema(schema.copy(theme = updatedTheme))
+                                Toast.makeText(context, "Applied Pastel Dream Theme!", Toast.LENGTH_SHORT).show()
+                                showPresetThemeSwitcher = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1B4B)),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF8B5CF6))
+                        ) {
+                            Text("🌸 Pastel Dream (Violet & Rose)", color = Color(0xFF8B5CF6), fontWeight = FontWeight.Bold)
+                        }
+
+                        // Preset 4: Retro Arcade
+                        Button(
+                            onClick = {
+                                val updatedTheme = schema.theme.copy(
+                                    id = "retro_arcade",
+                                    name = "Retro Arcade 8-Bit",
+                                    primary_color = "#F59E0B",
+                                    accent_color = "#10B981",
+                                    bg_overlay = "#064E3B",
+                                    card_glass = "#047857",
+                                    font_family = "Roboto"
+                                )
+                                onSaveSchema(schema.copy(theme = updatedTheme))
+                                Toast.makeText(context, "Applied Retro Arcade Theme!", Toast.LENGTH_SHORT).show()
+                                showPresetThemeSwitcher = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF064E3B)),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF59E0B))
+                        ) {
+                            Text("🎮 Retro Arcade (Amber & Emerald)", color = Color(0xFFF59E0B), fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { showPresetThemeSwitcher = false },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder)
