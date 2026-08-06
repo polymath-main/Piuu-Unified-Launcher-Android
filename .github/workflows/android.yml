@@ -3,6 +3,7 @@ name: Android CI Build & Native C Core Compilation
 on:
   push:
     branches: [ "main", "master" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main", "master" ]
   workflow_dispatch:
@@ -70,3 +71,43 @@ jobs:
         path: |
           app/build/intermediates/cxx/**/libpiuu_core.so
           app/build/intermediates/merged_native_libs/**/libpiuu_core.so
+
+    - name: Prepare Release APK Artifacts with Versioning & Architecture
+      if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
+      run: |
+        mkdir -p release_assets
+        TAG_NAME="${GITHUB_REF_NAME:-v1.0.0}"
+        
+        # Copy and format APK names according to versioning rule: launcher_name + version + architecture + apk
+        find app/build/outputs/apk -name "*.apk" -type f | while read -r apk_file; do
+          filename=$(basename "$apk_file")
+          if [[ "$filename" == *"release"* ]]; then
+            cp "$apk_file" "release_assets/PiuuLauncher-${TAG_NAME}-universal-release.apk"
+          elif [[ "$filename" == *"debug"* ]]; then
+            cp "$apk_file" "release_assets/PiuuLauncher-${TAG_NAME}-universal-debug.apk"
+          fi
+        done
+        ls -la release_assets/
+
+    - name: Publish GitHub Release Assets
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: release_assets/*.apk
+        name: "Piuu Launcher ${{ github.ref_name }}"
+        body: |
+          ## 🚀 Piuu Unified Launcher `${{ github.ref_name }}`
+          
+          ### 📱 Official Release Artifact Downloads
+          * **Production Release**: `PiuuLauncher-${{ github.ref_name }}-universal-release.apk`
+          * **Developer Debug**: `PiuuLauncher-${{ github.ref_name }}-universal-debug.apk`
+          
+          ### 🏛️ Features Included
+          * POSIX C Shared Binary Core (`libpiuu_core.so` 16KB Page Aligned)
+          * Kotlin Jetpack Compose 4-Column Grid UI & 2D Matrix Resizing
+          * App Drawer Status Bar Margin Fit & Smart Usage Row
+          * Piuu Extension Studio Desktop Builder Specs
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
