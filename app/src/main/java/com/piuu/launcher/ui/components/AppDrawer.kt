@@ -158,7 +158,9 @@ fun AppDrawer(
                 val safeAlpha = appDrawerTransparency.coerceIn(0.12f, 1.0f)
                 Box(
                     modifier = Modifier
-                        .fillMaxSize(0.94f)
+                        .fillMaxSize(0.95f)
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
                         .clip(RoundedCornerShape(24.dp))
                         .background(customBgColor.copy(alpha = safeAlpha))
                         .border(
@@ -171,9 +173,7 @@ fun AppDrawer(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .statusBarsPadding()
-                            .navigationBarsPadding()
-                            .padding(horizontal = 18.dp, vertical = 18.dp)
+                            .padding(horizontal = 18.dp, vertical = 16.dp)
                     ) {
                 // Header Search Input & Close Button Row
                 Row(
