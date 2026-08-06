@@ -292,6 +292,7 @@ fun AppDrawer(
                 Text("Smart Usage", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    val frequentApps = remember(apps) { apps.sortedByDescending { it.usage_count }.take(5) }
                     items(frequentApps, key = { app -> app.package_name }) { app ->
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,

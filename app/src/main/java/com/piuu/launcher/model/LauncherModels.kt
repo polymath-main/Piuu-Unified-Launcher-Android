@@ -75,6 +75,7 @@ data class LauncherTheme(
     val font_family: String = "Inter",
     val border_radius: Int = 20,
     val card_opacity: Float = 0.85f,
+    val card_glass: String = "#304159",
     val icon_pack_id: String = "default"
 )
 
