@@ -47,7 +47,7 @@ fun PiuuLauncherTheme(
     val view = LocalView.current
     val context = LocalContext.current
 
-    LaunchedEffect(theme, isDark) {
+    androidx.compose.runtime.SideEffect {
         isDarkMode = isDark
         theme?.let {
             activePrimaryColor = parseHexColor(it.primary_color, Color(0xFF3B82F6))

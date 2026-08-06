@@ -79,12 +79,18 @@ fun AppDrawer(
 
     // Reactive preference state triggers
     var prefVersion by remember { mutableIntStateOf(0) }
+    val activeBgColor = LauncherBackground
 
     val appDrawerTransparency = remember(prefManager.appDrawerTransparency, prefVersion) {
         prefManager.appDrawerTransparency
     }
-    val customBgColor = remember(prefManager.drawerBackgroundColor, prefVersion) {
-        com.piuu.launcher.ui.theme.parseRgbaOrHexColor(prefManager.drawerBackgroundColor, LauncherBackground)
+    val customBgColor = remember(prefManager.drawerBackgroundColor, prefVersion, activeBgColor) {
+        val configured = prefManager.drawerBackgroundColor
+        if (configured.isNotEmpty() && configured != "default") {
+            parseRgbaOrHexColor(configured, activeBgColor)
+        } else {
+            activeBgColor
+        }
     }
 
     androidx.compose.animation.AnimatedVisibility(

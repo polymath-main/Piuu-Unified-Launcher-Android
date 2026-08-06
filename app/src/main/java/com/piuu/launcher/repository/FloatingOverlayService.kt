@@ -212,12 +212,14 @@ class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, S
 
         val composeView = ComposeView(this).apply {
             setContent {
-                FloatingHeadComposable(
-                    onTap = { toggleExpand() },
-                    onDragStart = { showDismissZone(true) },
-                    onDrag = { dx, dy -> moveHead(dx, dy) },
-                    onDragEnd = { snapAndCheckDismiss() }
-                )
+                com.piuu.launcher.ui.theme.PiuuLauncherTheme {
+                    FloatingHeadComposable(
+                        onTap = { toggleExpand() },
+                        onDragStart = { showDismissZone(true) },
+                        onDrag = { dx, dy -> moveHead(dx, dy) },
+                        onDragEnd = { snapAndCheckDismiss() }
+                    )
+                }
             }
         }
 
@@ -251,10 +253,12 @@ class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, S
 
         val composeView = ComposeView(this).apply {
             setContent {
-                ExpandedPanelComposable(
-                    onMinimize = { toggleExpand() },
-                    onCloseService = { stopSelf() }
-                )
+                com.piuu.launcher.ui.theme.PiuuLauncherTheme {
+                    ExpandedPanelComposable(
+                        onMinimize = { toggleExpand() },
+                        onCloseService = { stopSelf() }
+                    )
+                }
             }
         }
 
@@ -446,13 +450,13 @@ fun FloatingHeadComposable(
             .background(
                 Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFF3B82F6), // Bright neon blue core
-                        Color(0xFF1E3A8A), // Deep indigo
-                        Color(0xFF0F172A)  // Slate boundary
+                        com.piuu.launcher.ui.theme.PrimaryBlue,
+                        com.piuu.launcher.ui.theme.AccentPurple,
+                        com.piuu.launcher.ui.theme.activeBgColor
                     )
                 )
             )
-            .border(2.dp, Color(0xAA3B82F6), CircleShape)
+            .border(2.dp, com.piuu.launcher.ui.theme.PrimaryBlue.copy(alpha = 0.8f), CircleShape)
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = {
