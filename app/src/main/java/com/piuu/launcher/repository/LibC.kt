@@ -32,6 +32,8 @@ object LibC {
     @JvmStatic private external fun nativeGetMemInfo(): DoubleArray?
     @JvmStatic private external fun nativeGetThreadCount(): Int
     @JvmStatic private external fun nativeKillProcess(packageName: String, pid: Int): Int
+    @JvmStatic private external fun getSystemMetrics(): String
+    @JvmStatic private external fun allocateArena(size: Int): java.nio.ByteBuffer?
 
     // Fallback JVM allocation tracker
     private val allocationPool = ConcurrentHashMap<String, ByteArray>()
