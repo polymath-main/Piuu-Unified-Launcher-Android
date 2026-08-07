@@ -213,8 +213,103 @@ class MarketplaceCore private constructor(private val context: Context) {
     }
 
     /**
+     * Install and unpack a .piuu bundle archive (compiled via wc-bundle-packer or piuu-studio).
+     */
+    fun installPiuuBundle(bundleFile: File): Pair<Boolean, String> {
+        if (!bundleFile.exists() || !bundleFile.isFile) {
+            return Pair(false, "Bundle file '${bundleFile.absolutePath}' does not exist.")
+        }
+
+        try {
+            var manifestJson = ""
+            var payloadJson = "{}"
+            val pluginDir = File(context.filesDir, "marketplace_plugins/${bundleFile.nameWithoutExtension}")
+            pluginDir.mkdirs()
+
+            java.util.zip.ZipFile(bundleFile).use { zip ->
+                val entries = zip.entries()
+                while (entries.hasMoreElements()) {
+                    val entry = entries.nextElement()
+                    val destFile = File(pluginDir, entry.name)
+
+                    if (entry.isDirectory) {
+                        destFile.mkdirs()
+                    } else {
+                        destFile.parentFile?.mkdirs()
+                        zip.getInputStream(entry).use { input ->
+                            destFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+
+                        if (entry.name == "plugin.json" || entry.name == "manifest.json") {
+                            manifestJson = destFile.readText()
+                        } else if (entry.name == "payload.json" || entry.name == "scheme.json") {
+                            payloadJson = destFile.readText()
+                        }
+                    }
+                }
+            }
+
+            if (manifestJson.isBlank()) {
+                return Pair(false, "Invalid .piuu bundle: Missing plugin.json or manifest.json")
+            }
+
+            val (valid, manifest) = PiuuPluginSdk.validateManifest(manifestJson)
+            if (!valid || manifest == null) {
+                return Pair(false, "Failed to validate bundle manifest.")
+            }
+
+            val plugin = MarketplacePlugin(
+                manifest = manifest,
+                payload = payloadJson.ifBlank { "{}" },
+                isInstalled = true,
+                isEnabled = true,
+                installedAt = System.currentTimeMillis()
+            )
+
+            val currentList = _installedPluginsFlow.value.toMutableList()
+            val existingIndex = currentList.indexOfFirst { it.manifest.id == manifest.id }
+            if (existingIndex >= 0) {
+                currentList[existingIndex] = plugin
+            } else {
+                currentList.add(plugin)
+            }
+
+            saveInstalledPluginsToStorage(currentList)
+            schemeManager.saveCustomizedScheme(manifest.category, manifest.id, payloadJson)
+
+            return Pair(true, "Installed .piuu bundle '${manifest.name}' [v${manifest.version}]")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error installing .piuu bundle", e)
+            return Pair(false, "Bundle unpack error: ${e.message}")
+        }
+    }
+
+    /**
+     * Install a .piuu bundle directly from an Android content URI.
+     */
+    fun installPiuuBundleFromUri(uri: android.net.Uri): Pair<Boolean, String> {
+        return try {
+            val tempFile = File(context.cacheDir, "imported_${System.currentTimeMillis()}.piuu")
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                tempFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            val result = installPiuuBundle(tempFile)
+            tempFile.delete()
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to read .piuu bundle from URI: $uri", e)
+            Pair(false, "Import failed: ${e.message}")
+        }
+    }
+
+    /**
      * Execute a sandboxed plugin action.
      */
+
     fun executePluginSdkAction(pluginId: String, actionName: String): PluginExecutionResult {
         val plugin = _installedPluginsFlow.value.find { it.manifest.id == pluginId }
             ?: return PluginExecutionResult(false, "Plugin '$pluginId' is not installed.")
@@ -245,6 +340,7 @@ class MarketplaceCore private constructor(private val context: Context) {
     }
 
     companion object {
+
         private const val TAG = "MarketplaceCore"
         private const val PREFS_NAME = "piuu_marketplace_core_prefs"
         private const val KEY_INSTALLED_PLUGINS = "key_installed_plugins_v2"
