@@ -441,6 +441,61 @@ fun QuickSettingsShade(
                             )
                         }
 
+                        if (showSystemWallpaper) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Divider(color = LauncherBorder)
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            var wpTransparency by remember { mutableStateOf(prefManager.wallpaperTransparency) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Wallpaper Transparency", fontSize = 12.sp, color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                                Text("${(wpTransparency * 100).toInt()}%", fontSize = 12.sp, color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                            }
+                            
+                            Slider(
+                                value = wpTransparency,
+                                onValueChange = {
+                                    wpTransparency = it
+                                    prefManager.wallpaperTransparency = it
+                                },
+                                valueRange = 0.0f..1.0f,
+                                colors = SliderDefaults.colors(activeTrackColor = PrimaryBlue, thumbColor = PrimaryBlue)
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf(0.0f to "0% Dark", 0.35f to "35%", 0.70f to "70%", 1.0f to "100%").forEach { (presetVal, label) ->
+                                    val isSelected = kotlin.math.abs(wpTransparency - presetVal) < 0.06f
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) PrimaryBlue else CardGlassBg)
+                                            .border(1.dp, if (isSelected) PrimaryBlue else LauncherBorder, RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                wpTransparency = presetVal
+                                                prefManager.wallpaperTransparency = presetVal
+                                            }
+                                            .padding(vertical = 6.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) Color.White else TextSecondary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Button(

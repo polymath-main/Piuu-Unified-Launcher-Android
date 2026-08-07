@@ -68,7 +68,7 @@ fun AppDrawer(
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("all") }
 
-    val categories = listOf("all", "piuu_suite", "social", "productivity", "entertainment", "utilities", "system")
+    val categories = listOf("all", "social", "productivity", "entertainment", "utilities", "games", "creative", "system", "piuu_suite")
 
     var showNotesDialog by remember { mutableStateOf(false) }
 

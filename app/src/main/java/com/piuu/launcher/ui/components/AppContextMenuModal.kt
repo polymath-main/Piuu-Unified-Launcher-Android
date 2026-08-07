@@ -1,6 +1,10 @@
 package com.piuu.launcher.ui.components
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -8,6 +12,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -25,14 +30,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.piuu.launcher.model.SystemApp
-import com.piuu.launcher.repository.LauncherConfig
-import com.piuu.launcher.repository.LauncherConfigManager
-import com.piuu.launcher.repository.LauncherPreferenceManager
-import com.piuu.launcher.repository.AppIconImage
-import com.piuu.launcher.repository.LauncherRepository
+import com.piuu.launcher.repository.*
 import com.piuu.launcher.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,27 +56,32 @@ fun AppContextMenuModal(
     val context = LocalContext.current
     val prefManager = remember { LauncherPreferenceManager.getInstance(context) }
     val configManager = remember { LauncherConfigManager.getInstance(context) }
+    val repository = remember { LauncherRepository(context) }
 
-    var currentTab by remember { mutableStateOf("info") } // info, create_folder, widgets, add_app, gestures, icon_config
+    var currentTab by remember { mutableStateOf("actions") } // actions, categories, wallpaper, appearance, native_info
+    var currentAppName by remember(app) { mutableStateOf(app.name) }
+    var currentCategory by remember(app) { mutableStateOf(app.category) }
+    var isFavorite by remember(app) { mutableStateOf(app.is_favorite) }
+    var showRenameDialog by remember { mutableStateOf(false) }
 
-    androidx.compose.ui.window.Dialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(vertical = 24.dp, horizontal = 16.dp),
+                .padding(vertical = 20.dp, horizontal = 16.dp),
             shape = RoundedCornerShape(28.dp),
             color = LauncherBackground,
-            border = RowDefaults.filledMaxOrNullBorder(1.dp, LauncherBorder)
+            border = androidx.compose.foundation.BorderStroke(1.dp, LauncherBorder)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(20.dp)
+                    .padding(18.dp)
             ) {
-                // ── Header Row ───────────────────────────────────────────────────
+                // ── 1. Header with App Icon, Name, Category Pill, and Fast Action Buttons ──
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
@@ -87,7 +96,7 @@ fun AppContextMenuModal(
                     ) {
                         AppIconImage(
                             packageName = app.package_name,
-                            modifier = Modifier.size(28.dp),
+                            modifier = Modifier.size(32.dp),
                             fallbackIconName = app.icon_name,
                             tintColor = PrimaryBlue
                         )
@@ -96,54 +105,132 @@ fun AppContextMenuModal(
                     Spacer(modifier = Modifier.width(12.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = app.name,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                        Text(
-                            text = app.package_name,
-                            fontSize = 11.sp,
-                            color = TextMuted
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = currentAppName,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Rename",
+                                tint = TextMuted,
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clickable { showRenameDialog = true }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            // Category Badge Pill
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(PrimaryBlue.copy(alpha = 0.15f))
+                                    .border(1.dp, PrimaryBlue.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
+                                    .clickable { currentTab = "categories" }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = currentCategory.uppercase(),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = PrimaryBlue
+                                )
+                            }
+
+                            Text(
+                                text = app.package_name,
+                                fontSize = 11.sp,
+                                color = TextMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
 
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(CardGlassBg)
+                    // Fast Action Buttons in Header: Launch, Favorite, Close
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
+                        IconButton(
+                            onClick = {
+                                isFavorite = !isFavorite
+                                repository.toggleAppFavorite(app.package_name)
+                                onPrefChanged()
+                                Toast.makeText(
+                                    context,
+                                    if (isFavorite) "Added to Favorites" else "Removed from Favorites",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(CardGlassBg)
+                        ) {
+                            Icon(
+                                imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                                contentDescription = "Favorite",
+                                tint = if (isFavorite) WarningAmber else TextSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(CardGlassBg)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = TextSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // ── Horizontal Navigation Tab List ──────────────────────────────
-                val tabs = listOf(
-                    "info" to "App Info",
-                    "gestures" to "Gestures",
-                    "icon_config" to "Icons & Columns",
-                    "widgets" to "Grids & Resize",
-                    "create_folder" to "New Folder",
-                    "add_app" to "Register App"
+                // ── 2. Categorized Navigation Tabs ──────────────────────────────────
+                val menuTabs = listOf(
+                    "actions" to "⚡ Actions",
+                    "categories" to "📂 Categories",
+                    "wallpaper" to "🖼️ Wallpaper",
+                    "appearance" to "🎨 Appearance",
+                    "native_info" to "🚀 Native & Info"
                 )
 
                 ScrollableTabRow(
-                    selectedTabIndex = tabs.indexOfFirst { it.first == currentTab }.coerceAtLeast(0),
+                    selectedTabIndex = menuTabs.indexOfFirst { it.first == currentTab }.coerceAtLeast(0),
                     containerColor = Color.Transparent,
                     contentColor = PrimaryBlue,
                     edgePadding = 0.dp,
                     indicator = { tabPositions ->
+                        val index = menuTabs.indexOfFirst { it.first == currentTab }.coerceAtLeast(0)
                         TabRowDefaults.SecondaryIndicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[tabs.indexOfFirst { it.first == currentTab }.coerceAtLeast(0)]),
+                            modifier = Modifier.tabIndicatorOffset(tabPositions[index]),
                             color = PrimaryBlue
                         )
                     }
                 ) {
-                    tabs.forEach { (key, label) ->
+                    menuTabs.forEach { (key, label) ->
                         Tab(
                             selected = currentTab == key,
                             onClick = { currentTab = key },
@@ -154,50 +241,382 @@ fun AppContextMenuModal(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // ── Content Sections ─────────────────────────────────────────────
+                // ── 3. Categorized Content Views ────────────────────────────────────
                 Box(modifier = Modifier.weight(1f)) {
                     when (currentTab) {
-                        "info" -> AppInfoSection(
+                        "actions" -> AppActionsSection(
                             app = app,
-                            onUninstall = {
+                            repository = repository,
+                            onUninstallApp = {
                                 onUninstallApp(app)
                                 onDismiss()
                             },
-                            allApps = allApps,
                             onPrefChanged = onPrefChanged,
                             onDismiss = onDismiss
                         )
-                        "create_folder" -> CreateFolderSection(
+                        "categories" -> AppCategoriesFolderSection(
                             app = app,
                             allApps = allApps,
-                            onFolderCreated = { folderName, list ->
-                                Toast.makeText(context, "Created folder '$folderName' with ${list.size} apps!", Toast.LENGTH_LONG).show()
-                                onDismiss()
-                            }
+                            currentCategory = currentCategory,
+                            onCategorySelected = { newCat ->
+                                currentCategory = newCat
+                                repository.updateAppCategory(app.package_name, newCat)
+                                onPrefChanged()
+                                Toast.makeText(context, "${app.name} assigned to '$newCat'", Toast.LENGTH_SHORT).show()
+                            },
+                            repository = repository,
+                            onPrefChanged = onPrefChanged,
+                            onDismiss = onDismiss
                         )
-                        "widgets" -> WidgetsResizeSection(
-                            configManager = configManager,
-                            onConfigChanged = onConfigChanged
-                        )
-                        "add_app" -> AddApplicationSection(
-                            onAddApp = { newApp ->
-                                onAddApp(newApp)
-                                Toast.makeText(context, "Registered new app: ${newApp.name}", Toast.LENGTH_SHORT).show()
-                                onDismiss()
-                            }
-                        )
-                        "gestures" -> GesturesConfigSection(
-                            prefManager = prefManager,
-                            onPrefChanged = onPrefChanged
-                        )
-                        "icon_config" -> IconConfigSection(
+                        "wallpaper" -> WallpaperTransparencySection(
                             prefManager = prefManager,
                             configManager = configManager,
                             onConfigChanged = onConfigChanged,
                             onPrefChanged = onPrefChanged
                         )
+                        "appearance" -> AppAppearanceSection(
+                            app = app,
+                            appName = currentAppName,
+                            onNameChange = { newName ->
+                                currentAppName = newName
+                                repository.updateAppCustomName(app.package_name, newName)
+                                onPrefChanged()
+                            },
+                            prefManager = prefManager,
+                            configManager = configManager,
+                            repository = repository,
+                            onConfigChanged = onConfigChanged,
+                            onPrefChanged = onPrefChanged
+                        )
+                        "native_info" -> NativeAndInfoSection(
+                            app = app
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Rename App Inline Dialog
+    if (showRenameDialog) {
+        var tempName by remember { mutableStateOf(currentAppName) }
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("Rename App Display Label", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary) },
+            text = {
+                OutlinedTextField(
+                    value = tempName,
+                    onValueChange = { tempName = it },
+                    label = { Text("App Name") },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PrimaryBlue,
+                        unfocusedBorderColor = LauncherBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (tempName.isNotBlank()) {
+                            currentAppName = tempName.trim()
+                            repository.updateAppCustomName(app.package_name, currentAppName)
+                            onPrefChanged()
+                            Toast.makeText(context, "Renamed to '$currentAppName'", Toast.LENGTH_SHORT).show()
+                        }
+                        showRenameDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) {
+                    Text("Cancel", color = TextMuted)
+                }
+            },
+            containerColor = LauncherBackground
+        )
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 1. ⚡ ACTIONS & SHORTCUTS SECTION
+// ════════════════════════════════════════════════════════════════════════════════
+@Composable
+fun AppActionsSection(
+    app: SystemApp,
+    repository: LauncherRepository,
+    onUninstallApp: () -> Unit,
+    onPrefChanged: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var showUninstallConfirm by remember { mutableStateOf(false) }
+    val isPinnedToDock = remember(app) { repository.getSchema().dock.app_packages.contains(app.package_name) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Quick Launch & Homescreen Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Button(
+                onClick = {
+                    try {
+                        val launchIntent = context.packageManager.getLaunchIntentForPackage(app.package_name)
+                        if (launchIntent != null) {
+                            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(launchIntent)
+                            repository.recordAppLaunch(app.package_name)
+                            onDismiss()
+                        } else {
+                            Toast.makeText(context, "Cannot launch ${app.name}", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Failed to launch ${app.name}", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(imageVector = Icons.Default.RocketLaunch, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Open App", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+
+            Button(
+                onClick = {
+                    val success = repository.addShortcutToHome(app.package_name, app.name)
+                    if (success) {
+                        Toast.makeText(context, "Added shortcut for ${app.name} to Home screen.", Toast.LENGTH_SHORT).show()
+                        onPrefChanged()
+                        onDismiss()
+                    } else {
+                        Toast.makeText(context, "Shortcut already exists or failed.", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Add to Home", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        }
+
+        // Dock Toggle & System App Settings
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Button(
+                onClick = {
+                    val success = repository.togglePinDock(app.package_name)
+                    if (success) {
+                        val msg = if (isPinnedToDock) "Removed ${app.name} from Dock." else "Pinned ${app.name} to Dock."
+                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                        onPrefChanged()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = if (isPinnedToDock) AccentPurple else CardGlassBg),
+                modifier = Modifier
+                    .weight(1f)
+                    .border(1.dp, if (isPinnedToDock) AccentPurple else LauncherBorder, RoundedCornerShape(14.dp)),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(
+                    imageVector = if (isPinnedToDock) Icons.Default.LinkOff else Icons.Default.Link,
+                    contentDescription = null,
+                    tint = if (isPinnedToDock) Color.White else TextPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    if (isPinnedToDock) "Unpin Dock" else "Pin to Dock",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = if (isPinnedToDock) Color.White else TextPrimary
+                )
+            }
+
+            Button(
+                onClick = {
+                    try {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.parse("package:${app.package_name}")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "System settings not available", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = CardGlassBg),
+                modifier = Modifier
+                    .weight(1f)
+                    .border(1.dp, LauncherBorder, RoundedCornerShape(14.dp)),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Settings, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("App Info", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            }
+        }
+
+        // Deep App Shortcuts
+        val shortcuts = remember(app) {
+            HardwareControlBridge.getInstance(context).getAppShortcuts(context, app.package_name)
+        }
+
+        if (shortcuts.isNotEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Deep Shortcuts", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                    shortcuts.forEach { shortcut ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(LauncherBackground)
+                                .clickable {
+                                    val launched = HardwareControlBridge.getInstance(context)
+                                        .startAppShortcut(context, app.package_name, shortcut.id)
+                                    if (launched) onDismiss()
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(imageVector = Icons.Default.ElectricBolt, contentDescription = null, tint = AccentPurple, modifier = Modifier.size(16.dp))
+                                Text(shortcut.shortLabel?.toString() ?: shortcut.id, fontSize = 13.sp, color = TextPrimary)
+                            }
+                            Icon(imageVector = Icons.Default.Launch, contentDescription = null, tint = TextMuted, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        // Play Store & Uninstall Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Button(
+                onClick = {
+                    try {
+                        val playStoreIntent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("market://details?id=${app.package_name}")
+                        ).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(playStoreIntent)
+                    } catch (e: Exception) {
+                        try {
+                            val webIntent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://play.google.com/store/apps/details?id=${app.package_name}")
+                            ).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(webIntent)
+                        } catch (ex: Exception) {
+                            Toast.makeText(context, "Cannot open Play Store for ${app.name}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = CardGlassBg),
+                modifier = Modifier
+                    .weight(1f)
+                    .border(1.dp, LauncherBorder, RoundedCornerShape(14.dp)),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Shop, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Play Store", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            }
+
+            Button(
+                onClick = { showUninstallConfirm = true },
+                colors = ButtonDefaults.buttonColors(containerColor = DangerRed.copy(alpha = 0.2f)),
+                modifier = Modifier
+                    .weight(1f)
+                    .border(1.dp, DangerRed.copy(alpha = 0.5f), RoundedCornerShape(14.dp)),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Delete, contentDescription = null, tint = DangerRed, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Uninstall", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = DangerRed)
+            }
+        }
+
+        // Uninstall confirmation card
+        if (showUninstallConfirm) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = DangerRed.copy(alpha = 0.15f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, DangerRed, RoundedCornerShape(16.dp))
+            ) {
+                Column(modifier = Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Confirm Uninstall?", fontWeight = FontWeight.Bold, color = DangerRed, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "This will launch the Android package uninstaller to remove '${app.name}'.",
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(
+                            onClick = { showUninstallConfirm = false },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Cancel")
+                        }
+                        Button(
+                            onClick = {
+                                try {
+                                    val uninstallIntent = Intent(
+                                        Intent.ACTION_DELETE,
+                                        Uri.parse("package:${app.package_name}")
+                                    ).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(uninstallIntent)
+                                    onUninstallApp()
+                                } catch (e: Exception) {
+                                    onUninstallApp()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Uninstall")
+                        }
                     }
                 }
             }
@@ -205,28 +624,608 @@ fun AppContextMenuModal(
     }
 }
 
-// ── 1. App Info Panel ────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+// 2. 📂 CATEGORIES & FOLDERS SECTION
+// ════════════════════════════════════════════════════════════════════════════════
 @Composable
-fun AppInfoSection(
+fun AppCategoriesFolderSection(
     app: SystemApp,
-    onUninstall: () -> Unit,
     allApps: List<SystemApp>,
+    currentCategory: String,
+    onCategorySelected: (String) -> Unit,
+    repository: LauncherRepository,
     onPrefChanged: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    var showUninstallConfirm by remember { mutableStateOf(false) }
+    val categoriesList = listOf(
+        "social" to "Social",
+        "productivity" to "Productivity",
+        "entertainment" to "Entertainment",
+        "utilities" to "Utilities",
+        "games" to "Games",
+        "creative" to "Creative",
+        "system" to "System",
+        "piuu_suite" to "Piuu Suite"
+    )
 
-    // Fetch real system details and cache size
+    val isCurrentlyHidden = remember(app) { repository.getHiddenApps().contains(app.package_name) }
+    var folderName by remember { mutableStateOf("") }
+    val selectedApps = remember { mutableStateListOf<SystemApp>(app) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // Category Assignment Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Assign Category", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                    Text("Current: ${currentCategory.uppercase()}", fontSize = 11.sp, color = TextMuted)
+                }
+
+                Text(
+                    "Tap any category to immediately re-categorize '${app.name}' across the App Drawer and Home screens.",
+                    fontSize = 11.sp,
+                    color = TextMuted
+                )
+
+                // 2-Column Grid of Category Pills
+                val chunked = categoriesList.chunked(2)
+                chunked.forEach { rowCategories ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowCategories.forEach { (catKey, catLabel) ->
+                            val isSelected = currentCategory.equals(catKey, ignoreCase = true)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) PrimaryBlue else LauncherBackground)
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) PrimaryBlue else LauncherBorder,
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { onCategorySelected(catKey) }
+                                    .padding(vertical = 10.dp, horizontal = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (isSelected) {
+                                        Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                    }
+                                    Text(
+                                        text = catLabel,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else TextPrimary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Hide / Unhide Toggle Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("App Drawer Visibility", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(
+                        if (isCurrentlyHidden) "App is hidden from Drawer" else "App is visible in Drawer",
+                        fontSize = 11.sp,
+                        color = if (isCurrentlyHidden) WarningAmber else SuccessGreen
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        if (isCurrentlyHidden) {
+                            repository.unhideApp(app.package_name)
+                            Toast.makeText(context, "${app.name} is now visible.", Toast.LENGTH_SHORT).show()
+                        } else {
+                            repository.hideApp(app.package_name)
+                            Toast.makeText(context, "${app.name} is now hidden.", Toast.LENGTH_SHORT).show()
+                        }
+                        onPrefChanged()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isCurrentlyHidden) SuccessGreen else AccentPurple
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isCurrentlyHidden) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (isCurrentlyHidden) "Unhide" else "Hide App", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // Create Virtual Folder Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Create Virtual Folder", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                Text("Group '${app.name}' and other apps into a unified virtual folder.", fontSize = 11.sp, color = TextMuted)
+
+                OutlinedTextField(
+                    value = folderName,
+                    onValueChange = { folderName = it },
+                    placeholder = { Text("Folder Name (e.g., Favorites)", color = TextMuted) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PrimaryBlue,
+                        unfocusedBorderColor = LauncherBorder,
+                        focusedContainerColor = LauncherBackground,
+                        unfocusedContainerColor = LauncherBackground,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text("Include Apps (${selectedApps.size} selected):", fontSize = 11.sp, color = TextSecondary, fontWeight = FontWeight.SemiBold)
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(allApps.take(15), key = { it.package_name }) { item ->
+                        val isChecked = selectedApps.any { it.package_name == item.package_name }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isChecked) PrimaryBlue.copy(alpha = 0.2f) else LauncherBackground)
+                                .border(1.dp, if (isChecked) PrimaryBlue else LauncherBorder, RoundedCornerShape(8.dp))
+                                .clickable {
+                                    if (isChecked) {
+                                        if (item.package_name != app.package_name) {
+                                            selectedApps.removeAll { it.package_name == item.package_name }
+                                        }
+                                    } else {
+                                        selectedApps.add(item)
+                                    }
+                                }
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                item.name,
+                                fontSize = 11.sp,
+                                color = if (isChecked) PrimaryBlue else TextPrimary,
+                                fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        val name = folderName.ifBlank { "Folder with ${app.name}" }
+                        Toast.makeText(context, "Created folder '$name' with ${selectedApps.size} apps!", Toast.LENGTH_SHORT).show()
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(imageVector = Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Create Folder", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 3. 🖼️ WALLPAPER & TRANSPARENCY CONTROL SECTION
+// ════════════════════════════════════════════════════════════════════════════════
+@Composable
+fun WallpaperTransparencySection(
+    prefManager: LauncherPreferenceManager,
+    configManager: LauncherConfigManager,
+    onConfigChanged: (LauncherConfig) -> Unit,
+    onPrefChanged: () -> Unit
+) {
+    val context = LocalContext.current
+    var showWallpaper by remember { mutableStateOf(configManager.config.showSystemWallpaper) }
+    var wallpaperTransparency by remember { mutableStateOf(prefManager.wallpaperTransparency) }
+    var drawerTransparency by remember { mutableStateOf(prefManager.appDrawerTransparency) }
+    var drawerBlur by remember { mutableStateOf(prefManager.appDrawerBlur.toFloat()) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // Live Wallpaper Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Show System Wallpaper", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        Text("Renders Android device wallpaper behind launcher", fontSize = 11.sp, color = TextMuted)
+                    }
+                    Switch(
+                        checked = showWallpaper,
+                        onCheckedChange = {
+                            showWallpaper = it
+                            configManager.setWallpaperEnabled(it)
+                            onConfigChanged(configManager.config.copy(showSystemWallpaper = it))
+                            onPrefChanged()
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue)
+                    )
+                }
+
+                if (showWallpaper) {
+                    Divider(color = LauncherBorder)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Wallpaper Transparency", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                        Text(
+                            "${(wallpaperTransparency * 100).toInt()}%",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryBlue
+                        )
+                    }
+
+                    Slider(
+                        value = wallpaperTransparency,
+                        onValueChange = {
+                            wallpaperTransparency = it
+                            prefManager.wallpaperTransparency = it
+                            onPrefChanged()
+                        },
+                        valueRange = 0.0f..1.0f,
+                        colors = SliderDefaults.colors(activeTrackColor = PrimaryBlue, thumbColor = PrimaryBlue)
+                    )
+
+                    // Quick Preset Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(0.0f to "0% Dark", 0.35f to "35%", 0.70f to "70%", 1.0f to "100% Raw").forEach { (presetVal, label) ->
+                            val isSelected = kotlin.math.abs(wallpaperTransparency - presetVal) < 0.06f
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) PrimaryBlue else LauncherBackground)
+                                    .border(1.dp, if (isSelected) PrimaryBlue else LauncherBorder, RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        wallpaperTransparency = presetVal
+                                        prefManager.wallpaperTransparency = presetVal
+                                        onPrefChanged()
+                                    }
+                                    .padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) Color.White else TextSecondary
+                                )
+                            }
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_SET_WALLPAPER).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "No system wallpaper chooser found", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(imageVector = Icons.Default.Wallpaper, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Change Device Wallpaper", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        // App Drawer Surface Transparency Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("App Drawer Glassmorphism", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Drawer Opacity", fontSize = 12.sp, color = TextPrimary)
+                    Text("${(drawerTransparency * 100).toInt()}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                }
+
+                Slider(
+                    value = drawerTransparency,
+                    onValueChange = {
+                        drawerTransparency = it
+                        prefManager.appDrawerTransparency = it
+                        onPrefChanged()
+                    },
+                    valueRange = 0.0f..1.0f,
+                    colors = SliderDefaults.colors(activeTrackColor = PrimaryBlue, thumbColor = PrimaryBlue)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Glass Blur Radius", fontSize = 12.sp, color = TextPrimary)
+                    Text("${drawerBlur.toInt()} px", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentPurple)
+                }
+
+                Slider(
+                    value = drawerBlur,
+                    onValueChange = {
+                        drawerBlur = it
+                        prefManager.appDrawerBlur = it.toInt()
+                        onPrefChanged()
+                    },
+                    valueRange = 0.0f..30.0f,
+                    colors = SliderDefaults.colors(activeTrackColor = AccentPurple, thumbColor = AccentPurple)
+                )
+            }
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 4. 🎨 APPEARANCE & CUSTOMIZATION SECTION
+// ════════════════════════════════════════════════════════════════════════════════
+@Composable
+fun AppAppearanceSection(
+    app: SystemApp,
+    appName: String,
+    onNameChange: (String) -> Unit,
+    prefManager: LauncherPreferenceManager,
+    configManager: LauncherConfigManager,
+    repository: LauncherRepository,
+    onConfigChanged: (LauncherConfig) -> Unit,
+    onPrefChanged: () -> Unit
+) {
+    val context = LocalContext.current
+    var homeIconSize by remember { mutableStateOf(configManager.config.homeIconSize.toFloat()) }
+    var drawerIconSize by remember { mutableStateOf(configManager.config.drawerIconSize.toFloat()) }
+    var drawerColumns by remember { mutableStateOf(prefManager.drawerColumnCount) }
+    var drawerShowLabels by remember { mutableStateOf(prefManager.drawerShowLabels) }
+
+    val accentPresets = listOf(
+        "#3B82F6" to "Blue",
+        "#8B5CF6" to "Purple",
+        "#10B981" to "Emerald",
+        "#F59E0B" to "Amber",
+        "#F43F5E" to "Rose",
+        "#06B6D4" to "Cyan"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // App Custom Accent Color
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("App Accent Color Tint", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    accentPresets.forEach { (hex, name) ->
+                        val color = parseHexColor(hex, PrimaryBlue)
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .border(1.dp, LauncherBorder, CircleShape)
+                                .clickable {
+                                    repository.updateAppAccentColor(app.package_name, hex)
+                                    onPrefChanged()
+                                    Toast.makeText(context, "Accent set to $name", Toast.LENGTH_SHORT).show()
+                                }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Icon Sizes & Grid Layout Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Icon Sizing & Layout", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Homescreen Icon Size", fontSize = 12.sp, color = TextPrimary)
+                    Text("${homeIconSize.toInt()} dp", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                }
+
+                Slider(
+                    value = homeIconSize,
+                    onValueChange = {
+                        homeIconSize = it
+                        onConfigChanged(configManager.config.copy(homeIconSize = it.toInt()))
+                    },
+                    valueRange = 36.0f..72.0f,
+                    colors = SliderDefaults.colors(activeTrackColor = PrimaryBlue, thumbColor = PrimaryBlue)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Drawer Icon Size", fontSize = 12.sp, color = TextPrimary)
+                    Text("${drawerIconSize.toInt()} dp", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                }
+
+                Slider(
+                    value = drawerIconSize,
+                    onValueChange = {
+                        drawerIconSize = it
+                        onConfigChanged(configManager.config.copy(drawerIconSize = it.toInt()))
+                    },
+                    valueRange = 36.0f..72.0f,
+                    colors = SliderDefaults.colors(activeTrackColor = PrimaryBlue, thumbColor = PrimaryBlue)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Drawer Columns Count", fontSize = 12.sp, color = TextPrimary)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        IconButton(onClick = {
+                            if (drawerColumns > 3) {
+                                drawerColumns--
+                                prefManager.drawerColumnCount = drawerColumns
+                                onPrefChanged()
+                            }
+                        }) {
+                            Icon(imageVector = Icons.Default.RemoveCircleOutline, contentDescription = null, tint = TextSecondary)
+                        }
+                        Text("$drawerColumns", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue, modifier = Modifier.align(Alignment.CenterVertically))
+                        IconButton(onClick = {
+                            if (drawerColumns < 6) {
+                                drawerColumns++
+                                prefManager.drawerColumnCount = drawerColumns
+                                onPrefChanged()
+                            }
+                        }) {
+                            Icon(imageVector = Icons.Default.AddCircleOutline, contentDescription = null, tint = TextSecondary)
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Show App Drawer Text Labels", fontSize = 12.sp, color = TextPrimary)
+                    Switch(
+                        checked = drawerShowLabels,
+                        onCheckedChange = {
+                            drawerShowLabels = it
+                            prefManager.drawerShowLabels = it
+                            onPrefChanged()
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 5. 🚀 NATIVE & SYSTEM INFO SECTION
+// ════════════════════════════════════════════════════════════════════════════════
+@Composable
+fun NativeAndInfoSection(app: SystemApp) {
+    val context = LocalContext.current
+
     val appDetails = remember(app) {
         val details = mutableMapOf<String, String>()
         try {
             val pm = context.packageManager
             val pInfo = pm.getPackageInfo(app.package_name, 0)
             val appInfo = pm.getApplicationInfo(app.package_name, 0)
-            
-            details["Version Name"] = pInfo.versionName ?: "Unknown"
-            details["Version Code"] = if (android.os.Build.VERSION.SDK_INT >= 28) {
+
+            details["Version Name"] = pInfo.versionName ?: "1.0.0"
+            details["Version Code"] = if (Build.VERSION.SDK_INT >= 28) {
                 pInfo.longVersionCode.toString()
             } else {
                 @Suppress("DEPRECATION")
@@ -234,7 +1233,7 @@ fun AppInfoSection(
             }
             details["Target SDK"] = appInfo.targetSdkVersion.toString()
             details["UID"] = appInfo.uid.toString()
-            
+
             val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
             details["First Install"] = sdf.format(java.util.Date(pInfo.firstInstallTime))
             details["Last Update"] = sdf.format(java.util.Date(pInfo.lastUpdateTime))
@@ -246,10 +1245,9 @@ fun AppInfoSection(
             details["First Install"] = "N/A"
             details["Last Update"] = "N/A"
         }
-        
-        // Query cache size
+
         val cacheSizeStr = try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val storageStatsManager = context.getSystemService(Context.STORAGE_STATS_SERVICE) as android.app.usage.StorageStatsManager
                 val uuid = android.os.storage.StorageManager.UUID_DEFAULT
                 val user = android.os.Process.myUserHandle()
@@ -277,208 +1275,10 @@ fun AppInfoSection(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
-            modifier = Modifier.fillMaxWidth().border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("System App Details", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
-                
-                DetailItem(label = "Package Name", value = app.package_name)
-                DetailItem(label = "Version Name", value = appDetails["Version Name"] ?: "1.0.0")
-                DetailItem(label = "Version Code", value = appDetails["Version Code"] ?: "1")
-                DetailItem(label = "Cache Size", value = appDetails["Cache Size"] ?: "0.00 MB")
-                DetailItem(label = "Category Group", value = app.category.uppercase())
-                DetailItem(label = "Target SDK Version", value = appDetails["Target SDK"] ?: "34")
-                DetailItem(label = "System UID", value = appDetails["UID"] ?: "N/A")
-                DetailItem(label = "Installation Date", value = appDetails["First Install"] ?: "N/A")
-                DetailItem(label = "Last Modification", value = appDetails["Last Update"] ?: "N/A")
-                DetailItem(label = "Primary Action URI", value = app.launch_intent)
-                DetailItem(label = "Total Launcher Launches", value = "${app.usage_count} launch events")
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                Divider(color = LauncherBorder)
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text("Application Summary", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextMuted)
-                Text(app.description.ifBlank { "No description available for this package." }, fontSize = 13.sp, color = TextPrimary)
-            }
-        }
-
-        val repository = remember { LauncherRepository(context) }
-        val isCurrentlyHidden = remember(app) { repository.getHiddenApps().contains(app.package_name) }
-        val isPinnedToDock = remember(app) { repository.getSchema().dock.app_packages.contains(app.package_name) }
-
-        // Row for Quick Action Buttons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Button(
-                onClick = {
-                    try {
-                        val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = android.net.Uri.parse("package:${app.package_name}")
-                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(intent)
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "System settings not available for simulated package: ${app.name}", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("App Info", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            }
-
-            Button(
-                onClick = {
-                    if (isCurrentlyHidden) {
-                        repository.unhideApp(app.package_name)
-                        Toast.makeText(context, "${app.name} is now visible.", Toast.LENGTH_SHORT).show()
-                    } else {
-                        repository.hideApp(app.package_name)
-                        Toast.makeText(context, "${app.name} is now hidden.", Toast.LENGTH_SHORT).show()
-                    }
-                    onPrefChanged()
-                    onDismiss()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = if (isCurrentlyHidden) SuccessGreen else AccentPurple),
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Icon(
-                    imageVector = if (isCurrentlyHidden) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(if (isCurrentlyHidden) "Unhide" else "Hide", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            }
-        }
-
-        // Row 2 for Shortcut & Dock actions
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Button(
-                onClick = {
-                    val success = repository.addShortcutToHome(app.package_name, app.name)
-                    if (success) {
-                        Toast.makeText(context, "Added shortcut for ${app.name} to Home screen.", Toast.LENGTH_SHORT).show()
-                        onPrefChanged()
-                        onDismiss()
-                    } else {
-                        Toast.makeText(context, "Failed to add shortcut.", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Add to Home", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            }
-
-            Button(
-                onClick = {
-                    val success = repository.togglePinDock(app.package_name)
-                    if (success) {
-                        val msg = if (isPinnedToDock) "Removed ${app.name} from Dock." else "Pinned ${app.name} to Dock."
-                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                        onPrefChanged()
-                        onDismiss()
-                    } else {
-                        Toast.makeText(context, "Failed to update Dock.", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = if (isPinnedToDock) DangerRed else PrimaryBlue),
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Icon(
-                    imageVector = if (isPinnedToDock) Icons.Default.LinkOff else Icons.Default.Link,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(if (isPinnedToDock) "Unpin Dock" else "Pin Dock", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            }
-        }
-
-        // Row 3 for Play Store & Uninstall actions
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Button(
-                onClick = {
-                    try {
-                        val playStoreIntent = android.content.Intent(
-                            android.content.Intent.ACTION_VIEW,
-                            android.net.Uri.parse("market://details?id=${app.package_name}")
-                        ).apply {
-                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(playStoreIntent)
-                    } catch (e: Exception) {
-                        try {
-                            val webIntent = android.content.Intent(
-                                android.content.Intent.ACTION_VIEW,
-                                android.net.Uri.parse("https://play.google.com/store/apps/details?id=${app.package_name}")
-                            ).apply {
-                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(webIntent)
-                        } catch (ex: Exception) {
-                            Toast.makeText(context, "Cannot open Play Store for ${app.name}", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = AccentPurple),
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Shop, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Play Store", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            }
-
-            Button(
-                onClick = {
-                    try {
-                        val uninstallIntent = android.content.Intent(
-                            android.content.Intent.ACTION_DELETE,
-                            android.net.Uri.parse("package:${app.package_name}")
-                        ).apply {
-                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(uninstallIntent)
-                        onUninstall()
-                    } catch (e: Exception) {
-                        onUninstall()
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Uninstall", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            }
-        }
-
-        // Row 4: Process Terminate / Reclaim RAM Native Hook
+        // Native C RAM Reclaim Button
         Button(
             onClick = {
-                val result = com.piuu.launcher.repository.LibC.kill(context, app.package_name)
+                val result = LibC.kill(context, app.package_name)
                 if (result == 0) {
                     Toast.makeText(context, "Process for '${app.name}' stopped. RAM reclaimed.", Toast.LENGTH_SHORT).show()
                 } else {
@@ -494,143 +1294,32 @@ fun AppInfoSection(
             Text("Stop Process & Reclaim RAM", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
 
-        // App Shortcuts Section (Dynamic & Manifest shortcuts)
-        val shortcuts = remember(app) {
-            com.piuu.launcher.repository.HardwareControlBridge.getInstance(context).getAppShortcuts(context, app.package_name)
-        }
+        // Detailed System Spec Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("System Diagnostics", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
 
-        if (shortcuts.isNotEmpty()) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = CardGlassBg),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Deep App Shortcuts", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
-                    shortcuts.forEach { shortcut ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(CardGlassBg)
-                                .clickable {
-                                    val launched = com.piuu.launcher.repository.HardwareControlBridge.getInstance(context)
-                                        .startAppShortcut(context, app.package_name, shortcut.id)
-                                    if (launched) onDismiss()
-                                }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(imageVector = Icons.Default.ElectricBolt, contentDescription = null, tint = AccentPurple, modifier = Modifier.size(16.dp))
-                                Text(shortcut.shortLabel?.toString() ?: shortcut.id, fontSize = 13.sp, color = TextPrimary)
-                            }
-                            Icon(imageVector = Icons.Default.Launch, contentDescription = null, tint = TextMuted, modifier = Modifier.size(14.dp))
-                        }
-                    }
-                }
-            }
-        }
-
-        val hiddenList = remember { repository.getHiddenApps() }
-        val hiddenAppObjects = allApps.filter { it.package_name in hiddenList }
-
-        if (hiddenAppObjects.isNotEmpty()) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = CardGlassBg),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Hidden Applications Manager", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
-                    Text("These apps are hidden from your homescreen and drawer. Tap 'Unhide' to restore them.", fontSize = 11.sp, color = TextMuted)
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    hiddenAppObjects.forEach { hiddenApp ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(PrimaryBlue.copy(alpha = 0.2f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(imageVector = Icons.Default.Apps, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(14.dp))
-                                }
-                                Text(hiddenApp.name, fontSize = 13.sp, color = TextPrimary)
-                            }
-                            TextButton(
-                                onClick = {
-                                    repository.unhideApp(hiddenApp.package_name)
-                                    Toast.makeText(context, "${hiddenApp.name} is now visible.", Toast.LENGTH_SHORT).show()
-                                    onPrefChanged()
-                                }
-                            ) {
-                                Text("Unhide", fontSize = 12.sp, color = SuccessGreen, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (!showUninstallConfirm) {
-            Button(
-                onClick = { showUninstallConfirm = true },
-                colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Uninstall & Purge Application", fontWeight = FontWeight.Bold)
-            }
-        } else {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = DangerRed.copy(alpha = 0.15f)),
-                modifier = Modifier.fillMaxWidth().border(1.dp, DangerRed, RoundedCornerShape(16.dp))
-            ) {
-                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Confirm Uninstallation?", fontWeight = FontWeight.Bold, color = DangerRed, fontSize = 14.sp)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text("This will invoke the Android system installer to remove '${app.name}' and clear its local configuration cache.", color = TextPrimary, fontSize = 12.sp, textAlign = TextAlign.Center)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedButton(
-                            onClick = { showUninstallConfirm = false },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Cancel")
-                        }
-                        Button(
-                            onClick = onUninstall,
-                            colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Uninstall")
-                        }
-                    }
-                }
+                DetailRow("Package", app.package_name)
+                DetailRow("Version Name", appDetails["Version Name"] ?: "1.0.0")
+                DetailRow("Version Code", appDetails["Version Code"] ?: "1")
+                DetailRow("Cache Memory", appDetails["Cache Size"] ?: "0.00 MB")
+                DetailRow("Target SDK", appDetails["Target SDK"] ?: "34")
+                DetailRow("Process UID", appDetails["UID"] ?: "N/A")
+                DetailRow("First Installed", appDetails["First Install"] ?: "N/A")
+                DetailRow("Last Updated", appDetails["Last Update"] ?: "N/A")
+                DetailRow("Total Launches", "${app.usage_count} times")
             }
         }
     }
 }
 
 @Composable
-fun DetailItem(label: String, value: String) {
+fun DetailRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
@@ -638,642 +1327,4 @@ fun DetailItem(label: String, value: String) {
         Text(label, fontSize = 12.sp, color = TextMuted)
         Text(value, fontSize = 12.sp, color = TextPrimary, fontWeight = FontWeight.Bold)
     }
-}
-
-// ── 2. Create Virtual Folder Panel ───────────────────────────────────────────
-@Composable
-fun CreateFolderSection(app: SystemApp, allApps: List<SystemApp>, onFolderCreated: (String, List<SystemApp>) -> Unit) {
-    var folderName by remember { mutableStateOf("") }
-    val selectedApps = remember { mutableStateListOf<SystemApp>(app) }
-
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text("Create custom app folders directly inside the Launcher list.", fontSize = 12.sp, color = TextMuted)
-
-        OutlinedTextField(
-            value = folderName,
-            onValueChange = { folderName = it },
-            placeholder = { Text("E.g., Production Suite", color = TextMuted) },
-            label = { Text("Virtual Folder Name") },
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = PrimaryBlue,
-                unfocusedBorderColor = LauncherBorder,
-                focusedContainerColor = CardGlassBg,
-                unfocusedContainerColor = CardGlassBg,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Text("Select Apps to Group", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
-
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
-                .padding(4.dp)
-        ) {
-            items(allApps, key = { it.package_name }) { item ->
-                val isChecked = selectedApps.any { it.package_name == item.package_name }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable {
-                            if (isChecked) {
-                                if (item.package_name != app.package_name) {
-                                    selectedApps.removeAll { it.package_name == item.package_name }
-                                }
-                            } else {
-                                selectedApps.add(item)
-                            }
-                        }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Checkbox(
-                        checked = isChecked,
-                        onCheckedChange = null,
-                        colors = CheckboxDefaults.colors(checkedColor = PrimaryBlue)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(item.name, color = TextPrimary, fontSize = 13.sp)
-                }
-            }
-        }
-
-        Button(
-            onClick = {
-                if (folderName.isBlank()) {
-                    onFolderCreated("Custom Folder", selectedApps.toList())
-                } else {
-                    onFolderCreated(folderName, selectedApps.toList())
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
-        ) {
-            Icon(imageVector = Icons.Default.CreateNewFolder, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Create Custom Folder", fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-// ── 3. Widgets Grid Resize Panel ─────────────────────────────────────────────
-@Composable
-fun WidgetsResizeSection(configManager: LauncherConfigManager, onConfigChanged: (LauncherConfig) -> Unit) {
-    val currentConfig = configManager.config
-    var homeColumns by remember { mutableStateOf(currentConfig.homeColumns) }
-    var homeRows by remember { mutableStateOf(currentConfig.homeRows) }
-    var transparency by remember { mutableStateOf(currentConfig.backgroundTransparency) }
-    var systemWallpaper by remember { mutableStateOf(currentConfig.showSystemWallpaper) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text("Customize homescreen grid parameters and widget layouts dynamically.", fontSize = 12.sp, color = TextMuted)
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
-            modifier = Modifier.fillMaxWidth().border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("Homescreen Grid Rows & Columns", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
-                
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Columns count: $homeColumns", fontSize = 13.sp, color = TextPrimary)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        IconButton(onClick = { if (homeColumns > 3) { homeColumns--; onConfigChanged(currentConfig.copy(homeColumns = homeColumns)) } }) {
-                            Icon(imageVector = Icons.Default.RemoveCircleOutline, contentDescription = null, tint = TextSecondary)
-                        }
-                        IconButton(onClick = { if (homeColumns < 6) { homeColumns++; onConfigChanged(currentConfig.copy(homeColumns = homeColumns)) } }) {
-                            Icon(imageVector = Icons.Default.AddCircleOutline, contentDescription = null, tint = TextSecondary)
-                        }
-                    }
-                }
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Rows count: $homeRows", fontSize = 13.sp, color = TextPrimary)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        IconButton(onClick = { if (homeRows > 4) { homeRows--; onConfigChanged(currentConfig.copy(homeRows = homeRows)) } }) {
-                            Icon(imageVector = Icons.Default.RemoveCircleOutline, contentDescription = null, tint = TextSecondary)
-                        }
-                        IconButton(onClick = { if (homeRows < 9) { homeRows++; onConfigChanged(currentConfig.copy(homeRows = homeRows)) } }) {
-                            Icon(imageVector = Icons.Default.AddCircleOutline, contentDescription = null, tint = TextSecondary)
-                        }
-                    }
-                }
-            }
-        }
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
-            modifier = Modifier.fillMaxWidth().border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Transparency & Backdrop Preferences", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
-                
-                Text("Background opacity: ${(transparency * 100).toInt()}%", fontSize = 12.sp, color = TextMuted)
-                Slider(
-                    value = transparency,
-                    onValueChange = {
-                        transparency = it
-                        onConfigChanged(currentConfig.copy(backgroundTransparency = it))
-                    },
-                    valueRange = 0.0f..1.0f,
-                    colors = SliderDefaults.colors(activeTrackColor = PrimaryBlue, thumbColor = PrimaryBlue)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Live System Wallpaper Support", fontSize = 12.sp, color = TextPrimary)
-                    Switch(
-                        checked = systemWallpaper,
-                        onCheckedChange = {
-                            systemWallpaper = it
-                            onConfigChanged(currentConfig.copy(showSystemWallpaper = it))
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue, checkedTrackColor = PrimaryBlue.copy(alpha = 0.4f))
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ── 4. Add Simulated App Registry ───────────────────────────────────────────
-@Composable
-fun AddApplicationSection(onAddApp: (SystemApp) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var packageName by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("utilities") }
-    var iconName by remember { mutableStateOf("apps") }
-
-    val categories = listOf("utilities", "social", "productivity", "entertainment", "creative", "system")
-    val icons = listOf("apps", "globe", "phone", "message", "camera", "music", "mail", "settings", "note", "calculator", "clock")
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text("Create simulated package entries to test the App Drawer category sorting system.", fontSize = 12.sp, color = TextMuted)
-
-        OutlinedTextField(
-            value = name,
-            onValueChange = { name = it },
-            placeholder = { Text("E.g., Discord Messenger", color = TextMuted) },
-            label = { Text("Application Label") },
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PrimaryBlue, unfocusedBorderColor = LauncherBorder),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        OutlinedTextField(
-            value = packageName,
-            onValueChange = { packageName = it },
-            placeholder = { Text("E.g., com.discord", color = TextMuted) },
-            label = { Text("Package Name identifier") },
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PrimaryBlue, unfocusedBorderColor = LauncherBorder),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Text("Select Category Group", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
-        ScrollableTabRow(
-            selectedTabIndex = categories.indexOf(category),
-            containerColor = Color.Transparent,
-            edgePadding = 0.dp
-        ) {
-            categories.forEach { cat ->
-                Tab(
-                    selected = category == cat,
-                    onClick = { category = cat },
-                    text = { Text(cat.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-                )
-            }
-        }
-
-        Text("Select Symbol Icon", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            icons.take(6).forEach { ic ->
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(if (iconName == ic) PrimaryBlue else CardGlassBg)
-                        .border(1.dp, if (iconName == ic) PrimaryBlue else LauncherBorder, CircleShape)
-                        .clickable { iconName = ic },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = when(ic) {
-                            "globe" -> Icons.Default.Public
-                            "phone" -> Icons.Default.Phone
-                            "message" -> Icons.Default.Message
-                            "camera" -> Icons.Default.CameraAlt
-                            "music" -> Icons.Default.MusicNote
-                            else -> Icons.Default.Apps
-                        },
-                        contentDescription = ic,
-                        modifier = Modifier.size(16.dp),
-                        tint = if (iconName == ic) Color.White else TextPrimary
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Button(
-            onClick = {
-                if (name.isNotBlank() && packageName.isNotBlank()) {
-                    onAddApp(
-                        SystemApp(
-                            package_name = packageName.trim(),
-                            name = name.trim(),
-                            icon_name = iconName,
-                            category = category,
-                            launch_intent = "intent://$packageName",
-                            usage_count = 0,
-                            badge_count = 0,
-                            is_favorite = false,
-                            accent_color = "#3B82F6",
-                            description = "Simulated Custom User App"
-                        )
-                    )
-                }
-            },
-            enabled = name.isNotBlank() && packageName.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
-        ) {
-            Icon(imageVector = Icons.Default.Add, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Register App & Add to Drawer", fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-// ── 5. Gestures Configuration Panel ─────────────────────────────────────────
-@Composable
-fun GesturesConfigSection(prefManager: LauncherPreferenceManager, onPrefChanged: () -> Unit) {
-    var swipeUp by remember { mutableStateOf(prefManager.gestureSwipeUp) }
-    var swipeDown by remember { mutableStateOf(prefManager.gestureSwipeDown) }
-    var doubleTap by remember { mutableStateOf(prefManager.gestureDoubleTap) }
-    var swipeLeft by remember { mutableStateOf(prefManager.gestureSwipeLeft) }
-    var swipeRight by remember { mutableStateOf(prefManager.gestureSwipeRight) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text("Bind custom actions to specific homescreen touch signals.", fontSize = 12.sp, color = TextMuted)
-
-        GestureSelectorCard(label = "Swipe Up gesture", selectedAction = swipeUp) {
-            prefManager.gestureSwipeUp = it
-            swipeUp = it
-            onPrefChanged()
-        }
-
-        GestureSelectorCard(label = "Swipe Down gesture", selectedAction = swipeDown) {
-            prefManager.gestureSwipeDown = it
-            swipeDown = it
-            onPrefChanged()
-        }
-
-        GestureSelectorCard(label = "Swipe Left gesture", selectedAction = swipeLeft) {
-            prefManager.gestureSwipeLeft = it
-            swipeLeft = it
-            onPrefChanged()
-        }
-
-        GestureSelectorCard(label = "Swipe Right gesture", selectedAction = swipeRight) {
-            prefManager.gestureSwipeRight = it
-            swipeRight = it
-            onPrefChanged()
-        }
-
-        GestureSelectorCard(label = "Double Tap gesture", selectedAction = doubleTap) {
-            prefManager.gestureDoubleTap = it
-            doubleTap = it
-            onPrefChanged()
-        }
-    }
-}
-
-@Composable
-fun GestureSelectorCard(label: String, selectedAction: String, onSelect: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    val actions = LauncherPreferenceManager.GESTURE_ACTIONS
-
-    Card(
-        colors = CardDefaults.cardColors(containerColor = CardGlassBg),
-        modifier = Modifier.fillMaxWidth().border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text(label, fontSize = 11.sp, color = TextMuted, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = true }
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val actionLabel = actions.find { it.first == selectedAction }?.second ?: selectedAction
-                Text(actionLabel, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null, tint = TextMuted)
-            }
-
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.background(LauncherBackground).border(1.dp, LauncherBorder)
-            ) {
-                actions.forEach { (actionKey, actionVal) ->
-                    DropdownMenuItem(
-                        text = { Text(actionVal, color = TextPrimary, fontSize = 13.sp) },
-                        onClick = {
-                            onSelect(actionKey)
-                            expanded = false
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ── 6. Icon Sizes & Columns Config Panel ────────────────────────────────────
-@Composable
-fun IconConfigSection(
-    prefManager: LauncherPreferenceManager,
-    configManager: LauncherConfigManager,
-    onConfigChanged: (LauncherConfig) -> Unit,
-    onPrefChanged: () -> Unit
-) {
-    val currentConfig = configManager.config
-    var homeIconSize by remember { mutableStateOf(currentConfig.homeIconSize.toFloat()) }
-    var drawerIconSize by remember { mutableStateOf(currentConfig.drawerIconSize.toFloat()) }
-    var drawerColumns by remember { mutableStateOf(prefManager.drawerColumnCount) }
-    var showFrequent by remember { mutableStateOf(prefManager.drawerShowFrequentlyUsed) }
-    var showCategories by remember { mutableStateOf(prefManager.drawerShowCategories) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text("Fine-tune icon dimensions and column layouts of the launcher and drawer panels.", fontSize = 12.sp, color = TextMuted)
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
-            modifier = Modifier.fillMaxWidth().border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Icon Sizing Preferences", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
-
-                Text("Homescreen Icon size: ${homeIconSize.toInt()} dp", fontSize = 12.sp, color = TextMuted)
-                Slider(
-                    value = homeIconSize,
-                    onValueChange = {
-                        homeIconSize = it
-                        onConfigChanged(currentConfig.copy(homeIconSize = it.toInt()))
-                    },
-                    valueRange = 36.0f..72.0f,
-                    colors = SliderDefaults.colors(activeTrackColor = PrimaryBlue, thumbColor = PrimaryBlue)
-                )
-
-                Text("Drawer Icon size: ${drawerIconSize.toInt()} dp", fontSize = 12.sp, color = TextMuted)
-                Slider(
-                    value = drawerIconSize,
-                    onValueChange = {
-                        drawerIconSize = it
-                        onConfigChanged(currentConfig.copy(drawerIconSize = it.toInt()))
-                    },
-                    valueRange = 36.0f..72.0f,
-                    colors = SliderDefaults.colors(activeTrackColor = PrimaryBlue, thumbColor = PrimaryBlue)
-                )
-            }
-        }
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
-            modifier = Modifier.fillMaxWidth().border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("App Drawer Elements config", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Drawer Columns: $drawerColumns", fontSize = 13.sp, color = TextPrimary)
-                    Row {
-                        IconButton(onClick = { if (drawerColumns > 3) { drawerColumns--; prefManager.drawerColumnCount = drawerColumns; onPrefChanged() } }) {
-                            Icon(imageVector = Icons.Default.RemoveCircleOutline, contentDescription = null, tint = TextSecondary)
-                        }
-                        IconButton(onClick = { if (drawerColumns < 6) { drawerColumns++; prefManager.drawerColumnCount = drawerColumns; onPrefChanged() } }) {
-                            Icon(imageVector = Icons.Default.AddCircleOutline, contentDescription = null, tint = TextSecondary)
-                        }
-                    }
-                }
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Show Frequently Used row", fontSize = 13.sp, color = TextPrimary)
-                    Switch(
-                        checked = showFrequent,
-                        onCheckedChange = {
-                            showFrequent = it
-                            prefManager.drawerShowFrequentlyUsed = it
-                            onPrefChanged()
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue)
-                    )
-                }
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Show Category Filter Chips", fontSize = 13.sp, color = TextPrimary)
-                    Switch(
-                        checked = showCategories,
-                        onCheckedChange = {
-                            showCategories = it
-                            prefManager.drawerShowCategories = it
-                            onPrefChanged()
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-                Divider(color = LauncherBorder)
-                Spacer(modifier = Modifier.height(4.dp))
-
-                var drawerTransparency by remember { mutableStateOf(prefManager.appDrawerTransparency) }
-                Text("Background Transparency: ${(drawerTransparency * 100).toInt()}%", fontSize = 12.sp, color = TextMuted)
-                Slider(
-                    value = drawerTransparency,
-                    onValueChange = {
-                        drawerTransparency = it
-                        prefManager.appDrawerTransparency = it
-                        onPrefChanged()
-                    },
-                    valueRange = 0.0f..1.0f,
-                    colors = SliderDefaults.colors(activeTrackColor = PrimaryBlue, thumbColor = PrimaryBlue)
-                )
-
-                Text("Background Color Preset", fontSize = 12.sp, color = TextMuted)
-                val presets = listOf(
-                    "#020817" to "Neural",
-                    "#0A0A0A" to "Midnight",
-                    "#1E1E38" to "Indigo",
-                    "#2E1B4E" to "Cyberpunk",
-                    "#321010" to "Crimson"
-                )
-                var activeColorHex by remember { mutableStateOf(prefManager.drawerBackgroundColor) }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                ) {
-                    presets.forEach { (hex, name) ->
-                        val parsedColor = parseHexColor(hex, Color.DarkGray)
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(parsedColor)
-                                .border(
-                                    width = if (activeColorHex == hex) 2.dp else 1.dp,
-                                    color = if (activeColorHex == hex) PrimaryBlue else Color.Transparent,
-                                    shape = CircleShape
-                                )
-                                .clickable {
-                                    activeColorHex = hex
-                                    prefManager.drawerBackgroundColor = hex
-                                    onPrefChanged()
-                                }
-                        )
-                    }
-                }
-
-                var showDrawerLabels by remember { mutableStateOf(prefManager.drawerShowLabels) }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Show Drawer App Labels", fontSize = 13.sp, color = TextPrimary)
-                    Switch(
-                        checked = showDrawerLabels,
-                        onCheckedChange = {
-                            showDrawerLabels = it
-                            prefManager.drawerShowLabels = it
-                            onPrefChanged()
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue)
-                    )
-                }
-            }
-        }
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = CardGlassBg),
-            modifier = Modifier.fillMaxWidth().border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("Custom Dock Configurations", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
-
-                var dockIconsCount by remember { mutableStateOf(prefManager.dockIconCount) }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Dock Maximum Apps: $dockIconsCount", fontSize = 13.sp, color = TextPrimary)
-                    Row {
-                        IconButton(onClick = { if (dockIconsCount > 3) { dockIconsCount--; prefManager.dockIconCount = dockIconsCount; onPrefChanged() } }) {
-                            Icon(imageVector = Icons.Default.RemoveCircleOutline, contentDescription = null, tint = TextSecondary)
-                        }
-                        IconButton(onClick = { if (dockIconsCount < 7) { dockIconsCount++; prefManager.dockIconCount = dockIconsCount; onPrefChanged() } }) {
-                            Icon(imageVector = Icons.Default.AddCircleOutline, contentDescription = null, tint = TextSecondary)
-                        }
-                    }
-                }
-
-                var dockSizeSlider by remember { mutableStateOf(prefManager.dockIconSize.toFloat()) }
-                Text("Dock Icon size: ${dockSizeSlider.toInt()} dp", fontSize = 12.sp, color = TextMuted)
-                Slider(
-                    value = dockSizeSlider,
-                    onValueChange = {
-                        dockSizeSlider = it
-                        prefManager.dockIconSize = it.toInt()
-                        onPrefChanged()
-                    },
-                    valueRange = 36.0f..72.0f,
-                    colors = SliderDefaults.colors(activeTrackColor = PrimaryBlue, thumbColor = PrimaryBlue)
-                )
-
-                var dockShowLabels by remember { mutableStateOf(prefManager.dockShowLabels) }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Show Dock Icon Labels", fontSize = 13.sp, color = TextPrimary)
-                    Switch(
-                        checked = dockShowLabels,
-                        onCheckedChange = {
-                            dockShowLabels = it
-                            prefManager.dockShowLabels = it
-                            onPrefChanged()
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue)
-                    )
-                }
-
-                var dockVisible by remember { mutableStateOf(prefManager.dockVisible) }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Dock Bar Visible", fontSize = 13.sp, color = TextPrimary)
-                    Switch(
-                        checked = dockVisible,
-                        onCheckedChange = {
-                            dockVisible = it
-                            prefManager.dockVisible = it
-                            onPrefChanged()
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue)
-                    )
-                }
-
-                var drawerHandleVisible by remember { mutableStateOf(prefManager.drawerHandleVisible) }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Show App Drawer Handle Button", fontSize = 13.sp, color = TextPrimary)
-                    Switch(
-                        checked = drawerHandleVisible,
-                        onCheckedChange = {
-                            drawerHandleVisible = it
-                            prefManager.drawerHandleVisible = it
-                            onPrefChanged()
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue)
-                    )
-                }
-            }
-        }
-    }
-}
-
-private object RowDefaults {
-    fun filledMaxOrNullBorder(width: androidx.compose.ui.unit.Dp, color: Color) = 
-        androidx.compose.foundation.BorderStroke(width, color)
 }

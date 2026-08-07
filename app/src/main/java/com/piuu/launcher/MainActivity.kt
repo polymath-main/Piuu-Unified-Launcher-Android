@@ -298,11 +298,21 @@ fun LauncherAppMain(
     }
 
     // Main Launcher View Container
+    val wallpaperAlpha = remember(prefVersion) { prefManager.wallpaperTransparency }
+    val launcherBgColor = remember(configState.showSystemWallpaper, wallpaperAlpha) {
+        if (configState.showSystemWallpaper) {
+            val dimAlpha = (1.0f - wallpaperAlpha).coerceIn(0.0f, 1.0f)
+            Color(0xFF020817).copy(alpha = dimAlpha)
+        } else {
+            Color(0xFF020817)
+        }
+    }
+
     PiuuLauncherTheme(theme = schema.theme) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (configState.showSystemWallpaper) Color.Transparent else Color(0xFF020817))
+                .background(launcherBgColor)
         ) {
         Column(
             modifier = Modifier

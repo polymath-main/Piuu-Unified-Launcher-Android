@@ -569,6 +569,39 @@ class LauncherRepository(private val context: Context) {
         return false
     }
 
+    fun updateAppCategory(packageName: String, newCategory: String): Boolean {
+        val apps = getApps().toMutableList()
+        val index = apps.indexOfFirst { it.package_name == packageName }
+        if (index != -1) {
+            apps[index] = apps[index].copy(category = newCategory.lowercase())
+            saveApps(apps)
+            return true
+        }
+        return false
+    }
+
+    fun updateAppCustomName(packageName: String, customName: String): Boolean {
+        val apps = getApps().toMutableList()
+        val index = apps.indexOfFirst { it.package_name == packageName }
+        if (index != -1) {
+            apps[index] = apps[index].copy(name = customName)
+            saveApps(apps)
+            return true
+        }
+        return false
+    }
+
+    fun updateAppAccentColor(packageName: String, colorHex: String): Boolean {
+        val apps = getApps().toMutableList()
+        val index = apps.indexOfFirst { it.package_name == packageName }
+        if (index != -1) {
+            apps[index] = apps[index].copy(accent_color = colorHex)
+            saveApps(apps)
+            return true
+        }
+        return false
+    }
+
     // ── Hidden Apps Storage ───────────────────────────────────────────────────
     fun getHiddenApps(): Set<String> {
         return prefs.getStringSet("hidden_packages", emptySet()) ?: emptySet()
