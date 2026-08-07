@@ -478,8 +478,8 @@ fun AppInfoSection(
         // Row 4: Process Terminate / Reclaim RAM Native Hook
         Button(
             onClick = {
-                val success = com.piuu.launcher.repository.LibC.kill(context, app.package_name)
-                if (success) {
+                val result = com.piuu.launcher.repository.LibC.kill(context, app.package_name)
+                if (result == 0) {
                     Toast.makeText(context, "Process for '${app.name}' stopped. RAM reclaimed.", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(context, "Reclaimed RAM for ${app.name}", Toast.LENGTH_SHORT).show()

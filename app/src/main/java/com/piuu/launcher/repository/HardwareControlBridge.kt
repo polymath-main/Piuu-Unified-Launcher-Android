@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
-import android.content.pm.ShortcutQuery
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
@@ -163,17 +162,6 @@ class HardwareControlBridge private constructor(private val context: Context) {
     }
 
     fun openBluetoothPanel(ctx: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            try {
-                val intent = Intent(Settings.Panel.ACTION_BLUETOOTH).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                ctx.startActivity(intent)
-                return
-            } catch (e: Exception) {
-                // Fallback
-            }
-        }
         openIntentSafely(ctx, Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
     }
 
@@ -333,9 +321,9 @@ class HardwareControlBridge private constructor(private val context: Context) {
             try {
                 val launcherApps = ctx.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
                 if (launcherApps != null && launcherApps.hasShortcutHostPermission()) {
-                    val query = ShortcutQuery().apply {
+                    val query = LauncherApps.ShortcutQuery().apply {
                         setPackage(packageName)
-                        setQueryFlags(ShortcutQuery.FLAG_MATCH_DYNAMIC or ShortcutQuery.FLAG_MATCH_PINNED or ShortcutQuery.FLAG_MATCH_MANIFEST)
+                        setQueryFlags(LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC or LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED or LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST)
                     }
                     val shortcuts: List<ShortcutInfo>? = launcherApps.getShortcuts(query, Process.myUserHandle())
                     if (!shortcuts.isNullOrEmpty()) {
