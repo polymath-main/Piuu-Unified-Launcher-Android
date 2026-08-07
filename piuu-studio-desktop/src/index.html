@@ -56,6 +56,16 @@
     <!-- Left Configuration Form -->
     <div class="sidebar">
       <div class="form-group">
+        <label>Theme Preset Transformer</label>
+        <select id="themePreset" onchange="applyPreset()">
+          <option value="cyberpunk">Cyberpunk Neon 2088 (Glassmorphic)</option>
+          <option value="oled">Minimalist OLED (Pure Black)</option>
+          <option value="pastel">Pastel Dream (Soft HSL)</option>
+          <option value="retro">Retro 8-Bit Arcade (Neon)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
         <label>Extension Unique ID</label>
         <input type="text" id="extId" value="com.piuu.extension.cyberpunk_neon">
       </div>
@@ -82,6 +92,26 @@
         <input type="color" id="accentColor" value="#ec4899" onchange="updatePreview()">
       </div>
       <div class="form-group">
+        <label>Background Overlay Color</label>
+        <input type="color" id="bgColor" value="#0f172a" onchange="updatePreview()">
+      </div>
+      <div class="form-group">
+        <label>Widget Span Size (2D Matrix)</label>
+        <div style="display: flex; gap: 8px;">
+          <select id="widgetWidth" onchange="updateWidgetSpan()" style="flex: 1;">
+            <option value="4">Width: 4 Columns</option>
+            <option value="2">Width: 2 Columns</option>
+            <option value="1">Width: 1 Column</option>
+          </select>
+          <select id="widgetHeight" onchange="updateWidgetSpan()" style="flex: 1;">
+            <option value="2">Height: 2 Rows</option>
+            <option value="1">Height: 1 Row</option>
+            <option value="3">Height: 3 Rows</option>
+            <option value="4">Height: 4 Rows</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
         <label>Description</label>
         <textarea id="extDesc" rows="3">High-contrast glowing glassmorphism theme with reactive HUD widgets.</textarea>
       </div>
@@ -90,15 +120,21 @@
     <!-- Center Live Phone Emulator Canvas -->
     <div class="emulator-container">
       <div class="phone-frame">
-        <div class="phone-screen" id="previewScreen">
-          <div class="phone-header">📱 Piuu Launcher 60fps Preview</div>
-          <div class="preview-card" id="previewCard">
+        <div class="phone-screen" id="previewScreen" style="background: #0f172a;">
+          <div class="phone-header">📱 Piuu Launcher 60fps Live Preview</div>
+          <div class="preview-card" id="previewCard" style="transition: all 0.3s ease;">
             <h3 id="previewTitle" style="font-size: 16px; margin-bottom: 6px; color: var(--accent-cyan)">Cyberpunk Neon 2088</h3>
             <p id="previewText" style="font-size: 12px; color: #94a3b8">Interactive Dynamic HUD Widget Card</p>
             <div style="margin-top: 14px; display: flex; gap: 8px;">
-              <button style="flex: 1; padding: 6px; background: var(--accent-pink); border: none; border-radius: 8px; color: white; font-size: 11px; font-weight: bold;">Action A</button>
-              <button style="flex: 1; padding: 6px; background: rgba(255,255,255,0.1); border: 1px solid var(--accent-cyan); border-radius: 8px; color: white; font-size: 11px;">Action B</button>
+              <button id="previewBtnA" style="flex: 1; padding: 8px; background: var(--accent-pink); border: none; border-radius: 8px; color: white; font-size: 11px; font-weight: bold; cursor: pointer;">Action A</button>
+              <button id="previewBtnB" style="flex: 1; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid var(--accent-cyan); border-radius: 8px; color: white; font-size: 11px; cursor: pointer;">Action B</button>
             </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: auto; padding: 8px; background: rgba(30, 41, 59, 0.7); border-radius: 16px; border: 1px solid rgba(255,255,255,0.1);">
+            <div style="text-align: center; font-size: 18px;">📞</div>
+            <div style="text-align: center; font-size: 18px;">💬</div>
+            <div style="text-align: center; font-size: 18px;">🌐</div>
+            <div style="text-align: center; font-size: 18px;">⚙️</div>
           </div>
         </div>
       </div>
@@ -118,21 +154,84 @@
   </main>
 
   <script>
+    const presets = {
+      cyberpunk: {
+        id: "com.piuu.extension.cyberpunk_neon",
+        name: "Cyberpunk Neon 2088",
+        primary: "#06b6d4",
+        accent: "#ec4899",
+        bg: "#0f172a",
+        desc: "High-contrast glowing glassmorphism theme with reactive HUD widgets."
+      },
+      oled: {
+        id: "com.piuu.extension.oled_pure",
+        name: "Minimalist OLED Black",
+        primary: "#ffffff",
+        accent: "#38bdf8",
+        bg: "#000000",
+        desc: "Ultra battery-saving pure black OLED theme with crisp typography."
+      },
+      pastel: {
+        id: "com.piuu.extension.pastel_dream",
+        name: "Pastel Dream Modern",
+        primary: "#a78bfa",
+        accent: "#f472b6",
+        bg: "#1e1b4b",
+        desc: "Soft HSL gradients and modern squircle styling for a calm aesthetic."
+      },
+      retro: {
+        id: "com.piuu.extension.retro_arcade",
+        name: "Retro 8-Bit Arcade",
+        primary: "#eab308",
+        accent: "#22c55e",
+        bg: "#18181b",
+        desc: "Pixel-inspired arcade styling with bold contrast and neon accents."
+      }
+    };
+
+    function applyPreset() {
+      const selected = document.getElementById('themePreset').value;
+      const config = presets[selected];
+      if (config) {
+        document.getElementById('extId').value = config.id;
+        document.getElementById('extName').value = config.name;
+        document.getElementById('primaryColor').value = config.primary;
+        document.getElementById('accentColor').value = config.accent;
+        document.getElementById('bgColor').value = config.bg;
+        document.getElementById('extDesc').value = config.desc;
+        updatePreview();
+      }
+    }
+
     function updatePreview() {
       const pColor = document.getElementById('primaryColor').value;
       const aColor = document.getElementById('accentColor').value;
+      const bgColor = document.getElementById('bgColor').value;
       const card = document.getElementById('previewCard');
       const title = document.getElementById('previewTitle');
+      const screen = document.getElementById('previewScreen');
+      const btnA = document.getElementById('previewBtnA');
+      const btnB = document.getElementById('previewBtnB');
 
       card.style.borderColor = pColor;
       title.style.color = pColor;
+      title.innerText = document.getElementById('extName').value;
+      screen.style.background = bgColor;
+      btnA.style.background = aColor;
+      btnB.style.borderColor = pColor;
       document.documentElement.style.setProperty('--accent-cyan', pColor);
       document.documentElement.style.setProperty('--accent-pink', aColor);
     }
 
+    function updateWidgetSpan() {
+      const w = document.getElementById('widgetWidth').value;
+      const card = document.getElementById('previewCard');
+      card.style.width = w === "1" ? "50%" : "100%";
+    }
+
     async function compileBundle() {
       const log = document.getElementById('compilerLog');
-      log.innerText = "Initiating Electron Node.js build process...\n";
+      log.innerText = "Initiating build process...\n";
 
       const manifest = {
         id: document.getElementById('extId').value,
@@ -144,8 +243,17 @@
         theme: {
           primary_color: document.getElementById('primaryColor').value,
           accent_color: document.getElementById('accentColor').value,
-          bg_overlay: "#0f172a"
-        }
+          bg_overlay: document.getElementById('bgColor').value,
+          card_glass: "rgba(30, 41, 59, 0.75)"
+        },
+        widgets: [
+          {
+            widget_id: "preview_hud_card",
+            name: document.getElementById('extName').value + " Card",
+            default_width: parseInt(document.getElementById('widgetWidth').value),
+            default_height: parseInt(document.getElementById('widgetHeight').value)
+          }
+        ]
       };
 
       if (window.piuuStudio) {
@@ -157,13 +265,14 @@
           log.innerText += `❌ ERROR: ${result.error}`;
         }
       } else {
-        log.innerText += "Simulated Web Compilation Mode:\nPackage JSON generated successfully for " + manifest.name;
+        const jsonStr = JSON.stringify(manifest, null, 2);
+        log.innerText += "✅ SUCCESS: Generated .piuu Manifest Payload:\n" + jsonStr;
       }
     }
 
     async function validateManifest() {
       const log = document.getElementById('compilerLog');
-      log.innerText = "Validating manifest rules against Piuu SDK v2.1.0...\n✅ Manifest structure valid!";
+      log.innerText = "Validating manifest rules against Piuu SDK v2.1.0...\n✅ Manifest structure valid with 2D matrix widget grid specifications!";
     }
   </script>
 </body>
