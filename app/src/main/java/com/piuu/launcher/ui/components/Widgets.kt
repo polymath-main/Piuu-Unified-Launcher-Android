@@ -32,8 +32,10 @@ import java.util.*
 @Composable
 fun ClockWidgetComposable(
     title: String? = null,
-    styleProps: StyleProps = StyleProps()
+    styleProps: StyleProps = StyleProps(),
+    onClick: (() -> Unit)? = null
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val dateStr = SimpleDateFormat("EEEE, MMMM d", Locale.US).format(Date())
     val timeStr = SimpleDateFormat("hh:mm", Locale.US).format(Date())
     val amPmStr = SimpleDateFormat("a", Locale.US).format(Date())
@@ -49,6 +51,10 @@ fun ClockWidgetComposable(
         modifier = Modifier
             .fillMaxWidth()
             .border(1.dp, borderCol, cardShape)
+            .clickable {
+                if (onClick != null) onClick()
+                else com.piuu.launcher.repository.HardwareControlBridge.getInstance(context).openClockApp(context)
+            }
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -84,8 +90,10 @@ fun ClockWidgetComposable(
 @Composable
 fun WeatherWidgetComposable(
     title: String? = null,
-    styleProps: StyleProps = StyleProps()
+    styleProps: StyleProps = StyleProps(),
+    onClick: (() -> Unit)? = null
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val cardShape = RoundedCornerShape((styleProps.borderRadius ?: 24).dp)
     val accentColor = if (!styleProps.accentColor.isNullOrBlank()) parseHexColor(styleProps.accentColor, WarningAmber) else WarningAmber
     val bgOpacity = styleProps.opacity ?: 0.15f
@@ -97,6 +105,10 @@ fun WeatherWidgetComposable(
         modifier = Modifier
             .fillMaxWidth()
             .border(1.dp, borderCol, cardShape)
+            .clickable {
+                if (onClick != null) onClick()
+                else com.piuu.launcher.repository.HardwareControlBridge.getInstance(context).openWeatherApp(context)
+            }
     ) {
         Row(
             modifier = Modifier.padding(18.dp),
@@ -136,8 +148,10 @@ fun WeatherWidgetComposable(
 fun BatteryWidgetComposable(
     metrics: SystemMetrics,
     title: String? = null,
-    styleProps: StyleProps = StyleProps()
+    styleProps: StyleProps = StyleProps(),
+    onClick: (() -> Unit)? = null
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val cardShape = RoundedCornerShape((styleProps.borderRadius ?: 24).dp)
     val accentColor = if (!styleProps.accentColor.isNullOrBlank()) parseHexColor(styleProps.accentColor, SuccessGreen) else SuccessGreen
     val bgOpacity = styleProps.opacity ?: 0.15f
@@ -149,6 +163,10 @@ fun BatteryWidgetComposable(
         modifier = Modifier
             .fillMaxWidth()
             .border(1.dp, borderCol, cardShape)
+            .clickable {
+                if (onClick != null) onClick()
+                else com.piuu.launcher.repository.HardwareControlBridge.getInstance(context).openBatterySaverSettings(context)
+            }
     ) {
         Row(
             modifier = Modifier.padding(18.dp),
@@ -175,7 +193,8 @@ fun BatteryWidgetComposable(
 fun SystemStatsWidgetComposable(
     metrics: SystemMetrics,
     title: String? = null,
-    styleProps: StyleProps = StyleProps()
+    styleProps: StyleProps = StyleProps(),
+    onClick: (() -> Unit)? = null
 ) {
     val cardShape = RoundedCornerShape((styleProps.borderRadius ?: 24).dp)
     val accentColor = if (!styleProps.accentColor.isNullOrBlank()) parseHexColor(styleProps.accentColor, AccentPurple) else AccentPurple
@@ -188,6 +207,7 @@ fun SystemStatsWidgetComposable(
         modifier = Modifier
             .fillMaxWidth()
             .border(1.dp, borderCol, cardShape)
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Row(
@@ -212,7 +232,7 @@ fun SystemStatsWidgetComposable(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("RAM: ${metrics.ram_used_mb} GB", fontSize = 12.sp, color = TextSecondary)
                     LinearProgressIndicator(
-                        progress = metrics.ram_used_mb / metrics.ram_total_mb,
+                        progress = (metrics.ram_used_mb / metrics.ram_total_mb.coerceAtLeast(1f)).coerceIn(0f, 1f),
                         color = accentColor,
                         trackColor = Color(0x33FFFFFF),
                         modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
@@ -228,7 +248,8 @@ fun MediaPlayerWidgetComposable(
     title: String? = null,
     styleProps: StyleProps = StyleProps()
 ) {
-    var isPlaying by remember { mutableStateOf(true) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var isPlaying by remember { mutableStateOf(false) }
     val cardShape = RoundedCornerShape((styleProps.borderRadius ?: 24).dp)
     val accentColor = if (!styleProps.accentColor.isNullOrBlank()) parseHexColor(styleProps.accentColor, AccentPurple) else AccentPurple
     val bgOpacity = styleProps.opacity ?: 0.15f
@@ -256,11 +277,19 @@ fun MediaPlayerWidgetComposable(
                 Icon(imageVector = Icons.Default.MusicNote, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = if (!title.isNullOrBlank()) title else "Midnight City", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                Text("M83 • Spotify", fontSize = 12.sp, color = TextSecondary)
+                Text(text = if (!title.isNullOrBlank()) title else "Media Player", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(if (isPlaying) "Playing • Media Key Bridge" else "Paused • Tap to Play", fontSize = 12.sp, color = TextSecondary)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { isPlaying = !isPlaying }) {
+                IconButton(onClick = {
+                    com.piuu.launcher.repository.HardwareControlBridge.getInstance(context).skipToPreviousTrack()
+                }) {
+                    Icon(imageVector = Icons.Default.SkipPrevious, contentDescription = "Previous", tint = TextPrimary)
+                }
+                IconButton(onClick = {
+                    isPlaying = !isPlaying
+                    com.piuu.launcher.repository.HardwareControlBridge.getInstance(context).toggleMediaPlayPause()
+                }) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = "Play/Pause",
@@ -268,13 +297,16 @@ fun MediaPlayerWidgetComposable(
                         modifier = Modifier.size(28.dp)
                     )
                 }
-                IconButton(onClick = { }) {
+                IconButton(onClick = {
+                    com.piuu.launcher.repository.HardwareControlBridge.getInstance(context).skipToNextTrack()
+                }) {
                     Icon(imageVector = Icons.Default.SkipNext, contentDescription = "Next", tint = TextPrimary)
                 }
             }
         }
     }
 }
+
 
 @Composable
 fun AiInsightWidgetComposable(

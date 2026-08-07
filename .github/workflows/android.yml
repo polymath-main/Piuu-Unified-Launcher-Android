@@ -3,7 +3,10 @@ name: Android CI Build & Native C Core Compilation
 on:
   workflow_dispatch:
   push:
+    branches: [ "main" ]
     tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   build:

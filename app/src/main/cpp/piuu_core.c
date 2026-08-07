@@ -210,7 +210,7 @@ Java_com_piuu_launcher_repository_LibC_nativeGetThreadCount(JNIEnv* env, jobject
 JNIEXPORT jint JNICALL
 Java_com_piuu_launcher_repository_LibC_nativeKillProcess(JNIEnv* env, jobject thiz, jstring jpackageName, jint pid) {
     if (pid > 0) {
-        LOGI("nativeKillProcess sending SIGTERM (15) to PID %d", pid);
+        LOGI("nativeKillProcess sending SIGTERM to PID %d", pid);
         kill(pid, SIGTERM);
         return 1;
     }
@@ -223,18 +223,34 @@ Java_com_piuu_launcher_repository_LibC_getSystemMetrics(JNIEnv *env, jobject thi
     char buffer[256];
     FILE* fp = fopen("/proc/stat", "r");
     if (fp) {
-        fgets(buffer, sizeof(buffer), fp);
+        if (!fgets(buffer, sizeof(buffer), fp)) {
+            strncpy(buffer, "unknown", sizeof(buffer) - 1);
+        }
         fclose(fp);
     } else {
-        strcpy(buffer, "unknown");
+        strncpy(buffer, "unknown", sizeof(buffer) - 1);
     }
+    buffer[sizeof(buffer) - 1] = '\0';
     return (*env)->NewStringUTF(env, buffer);
 }
 
-// Memory Arena for JS Extension Payloads
+// Memory Arena for Native Direct ByteBuffers
 JNIEXPORT jobject JNICALL
 Java_com_piuu_launcher_repository_LibC_allocateArena(JNIEnv *env, jobject thiz, jint size) {
-    void* buffer = malloc(size);
+    if (size <= 0) return NULL;
+    void* buffer = malloc((size_t)size);
     if (!buffer) return NULL;
+    memset(buffer, 0, (size_t)size);
     return (*env)->NewDirectByteBuffer(env, buffer, size);
 }
+
+JNIEXPORT void JNICALL
+Java_com_piuu_launcher_repository_LibC_nativeFreeArena(JNIEnv *env, jobject thiz, jobject byteBuffer) {
+    if (!byteBuffer) return;
+    void* buffer = (*env)->GetDirectBufferAddress(env, byteBuffer);
+    if (buffer) {
+        free(buffer);
+        LOGD("nativeFreeArena successfully released direct byte buffer at %p", buffer);
+    }
+}
+

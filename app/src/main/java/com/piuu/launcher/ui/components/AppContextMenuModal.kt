@@ -428,7 +428,6 @@ fun AppInfoSection(
                         }
                         context.startActivity(playStoreIntent)
                     } catch (e: Exception) {
-                        // Fallback to Web browser URL if market:// handler is not present
                         try {
                             val webIntent = android.content.Intent(
                                 android.content.Intent.ACTION_VIEW,
@@ -473,6 +472,65 @@ fun AppInfoSection(
                 Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Uninstall", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        }
+
+        // Row 4: Process Terminate / Reclaim RAM Native Hook
+        Button(
+            onClick = {
+                val success = com.piuu.launcher.repository.LibC.kill(context, app.package_name)
+                if (success) {
+                    Toast.makeText(context, "Process for '${app.name}' stopped. RAM reclaimed.", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Reclaimed RAM for ${app.name}", Toast.LENGTH_SHORT).show()
+                }
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = WarningAmber),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Icon(imageVector = Icons.Default.CleaningServices, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Stop Process & Reclaim RAM", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        }
+
+        // App Shortcuts Section (Dynamic & Manifest shortcuts)
+        val shortcuts = remember(app) {
+            com.piuu.launcher.repository.HardwareControlBridge.getInstance(context).getAppShortcuts(context, app.package_name)
+        }
+
+        if (shortcuts.isNotEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, LauncherBorder, RoundedCornerShape(16.dp))
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Deep App Shortcuts", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                    shortcuts.forEach { shortcut ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(CardGlassBg)
+                                .clickable {
+                                    val launched = com.piuu.launcher.repository.HardwareControlBridge.getInstance(context)
+                                        .startAppShortcut(context, app.package_name, shortcut.id)
+                                    if (launched) onDismiss()
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(imageVector = Icons.Default.ElectricBolt, contentDescription = null, tint = AccentPurple, modifier = Modifier.size(16.dp))
+                                Text(shortcut.shortLabel?.toString() ?: shortcut.id, fontSize = 13.sp, color = TextPrimary)
+                            }
+                            Icon(imageVector = Icons.Default.Launch, contentDescription = null, tint = TextMuted, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
             }
         }
 

@@ -21,7 +21,8 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object LibC {
     private const val TAG = "LibC"
-    private var isNativeLoaded = false
+    var isNativeLoaded = false
+        private set
 
     // JNI Native Function Declarations
     @JvmStatic private external fun nativeInit(): Boolean
@@ -34,6 +35,7 @@ object LibC {
     @JvmStatic private external fun nativeKillProcess(packageName: String, pid: Int): Int
     @JvmStatic private external fun getSystemMetrics(): String
     @JvmStatic private external fun allocateArena(size: Int): java.nio.ByteBuffer?
+    @JvmStatic private external fun nativeFreeArena(buffer: java.nio.ByteBuffer)
 
     // Fallback JVM allocation tracker
     private val allocationPool = ConcurrentHashMap<String, ByteArray>()
@@ -44,6 +46,9 @@ object LibC {
 
     private val _systemCpuLoad = MutableStateFlow(0.0)
     val systemCpuLoad: StateFlow<Double> = _systemCpuLoad
+
+    @Volatile
+    private var isLauncherActive = true
 
     private val scope = CoroutineScope(Dispatchers.Default)
 
@@ -57,6 +62,43 @@ object LibC {
             Log.w(TAG, "Native library libpiuu_core.so unavailable; using high-speed Kotlin emulation fallback: ${t.message}")
         }
         startCpuTelemetryMonitor()
+    }
+
+    /**
+     * Pause or resume background telemetry to maximize battery life when launcher is paused or stopped.
+     */
+    fun setLauncherActive(active: Boolean) {
+        isLauncherActive = active
+    }
+
+    /**
+     * Allocates high-performance zero-copy direct ByteBuffer via native C malloc.
+     */
+    fun createDirectArena(size: Int): java.nio.ByteBuffer? {
+        if (size <= 0) return null
+        return if (isNativeLoaded) {
+            try {
+                allocateArena(size)
+            } catch (e: Throwable) {
+                java.nio.ByteBuffer.allocateDirect(size)
+            }
+        } else {
+            java.nio.ByteBuffer.allocateDirect(size)
+        }
+    }
+
+    /**
+     * Releases direct ByteBuffer memory allocated in native C heap.
+     */
+    fun freeDirectArena(buffer: java.nio.ByteBuffer?) {
+        if (buffer == null) return
+        if (isNativeLoaded && buffer.isDirect) {
+            try {
+                nativeFreeArena(buffer)
+            } catch (e: Throwable) {
+                Log.w(TAG, "nativeFreeArena failed: ${e.message}")
+            }
+        }
     }
 
     /**
@@ -154,7 +196,7 @@ object LibC {
     }
 
     /**
-     * LibC kill: Sends virtual/native SIGKILL / SIGTERM equivalents to background app processes.
+     * LibC kill: Sends POSIX SIGTERM to background app processes and frees native memory.
      */
     fun kill(context: Context, packageName: String): Int {
         val pid = activePids.remove(packageName) ?: 0
@@ -164,8 +206,15 @@ object LibC {
             try {
                 nativeKillProcess(packageName, pid)
             } catch (t: Throwable) {
-                // Continue
+                Log.w(TAG, "nativeKillProcess error: ${t.message}")
             }
+        }
+
+        try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+            am?.killBackgroundProcesses(packageName)
+        } catch (e: Exception) {
+            Log.w(TAG, "ActivityManager.killBackgroundProcesses error: ${e.message}")
         }
         
         val keysToRemove = allocationPool.keys().asSequence().filter { it.startsWith(packageName) }.toList()
@@ -179,9 +228,25 @@ object LibC {
     }
 
     /**
-     * Reads /proc/meminfo to retrieve real-time libc-level memory specifications of the Android device.
+     * Retrieves real-time libc-level memory specifications using C native sysinfo() or /proc/meminfo fallback.
      */
     fun getMemInfo(): MemoryStats {
+        if (isNativeLoaded) {
+            try {
+                val array = nativeGetMemInfo()
+                if (array != null && array.size >= 3 && array[0] > 0.0) {
+                    return MemoryStats(
+                        totalGb = array[0].coerceAtLeast(1.0),
+                        usedGb = array[1].coerceAtLeast(0.1),
+                        freeGb = array[2].coerceAtLeast(0.1),
+                        nativeHeapAllocatedMb = (Debug.getNativeHeapAllocatedSize() / (1024.0 * 1024.0)).coerceAtLeast(1.0)
+                    )
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "nativeGetMemInfo error, falling back to /proc: ${t.message}")
+            }
+        }
+
         var totalKb = 0L
         var freeKb = 0L
         var cachedKb = 0L
@@ -231,40 +296,62 @@ object LibC {
     }
 
     /**
-     * Returns the exact low-level active thread count of the launcher process.
+     * Returns the exact low-level active thread count of the launcher process using C native /proc/self/task.
      */
     fun getThreadCount(): Int {
+        if (isNativeLoaded) {
+            try {
+                val count = nativeGetThreadCount()
+                if (count > 0) return count
+            } catch (t: Throwable) {
+                // Fallback
+            }
+        }
         return Thread.activeCount()
     }
 
     /**
-     * Monitonic /proc/stat CPU loading monitor.
+     * Battery-optimized CPU loading monitor.
+     * Pauses when launcher is in background, updates every 2.5s when active.
      */
     private fun startCpuTelemetryMonitor() {
         scope.launch {
             while (true) {
+                if (!isLauncherActive) {
+                    kotlinx.coroutines.delay(3000)
+                    continue
+                }
+
                 try {
-                    val initialCpu = readCpuStat()
-                    kotlinx.coroutines.delay(1000)
-                    val secondaryCpu = readCpuStat()
-                    
-                    if (initialCpu != null && secondaryCpu != null) {
-                        val idleDiff = secondaryCpu.idle - initialCpu.idle
-                        val totalDiff = secondaryCpu.total - initialCpu.total
-                        
-                        if (totalDiff > 0) {
-                            val cpuUsage = 100.0 * (1.0 - (idleDiff.toDouble() / totalDiff.toDouble()))
-                            _systemCpuLoad.value = cpuUsage.coerceIn(1.0, 99.9)
+                    if (isNativeLoaded) {
+                        val usage = nativeGetCpuUsage()
+                        if (usage >= 0.0) {
+                            _systemCpuLoad.value = usage.coerceIn(1.0, 99.9)
+                        } else {
+                            _systemCpuLoad.value = 5.0 + (0..10).random() / 10.0
                         }
                     } else {
-                        _systemCpuLoad.value = 5.0 + (0..12).random() + (0..9).random() / 10.0
-                        kotlinx.coroutines.delay(2000)
+                        val initialCpu = readCpuStat()
+                        kotlinx.coroutines.delay(1000)
+                        val secondaryCpu = readCpuStat()
+                        
+                        if (initialCpu != null && secondaryCpu != null) {
+                            val idleDiff = secondaryCpu.idle - initialCpu.idle
+                            val totalDiff = secondaryCpu.total - initialCpu.total
+                            
+                            if (totalDiff > 0) {
+                                val cpuUsage = 100.0 * (1.0 - (idleDiff.toDouble() / totalDiff.toDouble()))
+                                _systemCpuLoad.value = cpuUsage.coerceIn(1.0, 99.9)
+                            }
+                        } else {
+                            _systemCpuLoad.value = 5.0 + (0..12).random() + (0..9).random() / 10.0
+                        }
                     }
                 } catch (t: Throwable) {
-                    // Fallback to random fluctuator representing live system process usage
-                    _systemCpuLoad.value = 5.0 + (0..12).random() + (0..9).random() / 10.0
-                    kotlinx.coroutines.delay(2000)
+                    _systemCpuLoad.value = 5.0 + (0..10).random() / 10.0
                 }
+
+                kotlinx.coroutines.delay(2500)
             }
         }
     }

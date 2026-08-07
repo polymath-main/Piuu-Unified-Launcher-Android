@@ -26,6 +26,7 @@ import com.piuu.launcher.model.SystemMetrics
 import com.piuu.launcher.ui.theme.*
 import com.piuu.launcher.repository.LauncherPreferenceManager
 import com.piuu.launcher.repository.FloatingOverlayService
+import com.piuu.launcher.repository.HardwareControlBridge
 import com.piuu.launcher.isServiceRunning
 import com.piuu.launcher.toggleFloatingOverlay
 
@@ -53,6 +54,8 @@ fun QuickSettingsShade(
     if (!visible) return
 
     val context = androidx.compose.ui.platform.LocalContext.current
+    val hardwareBridge = remember { HardwareControlBridge.getInstance(context) }
+    val isFlashlightActive by hardwareBridge.isFlashlightOn.collectAsState()
 
     // Real Permission state trackers for Production-Grade gateway
     var hasCameraPermission by remember {
@@ -156,7 +159,114 @@ fun QuickSettingsShade(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // ── Quick Hardware & System Tiles Grid ────────────────────────────
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardGlassBg),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, LauncherBorder, RoundedCornerShape(20.dp))
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "Quick Controls",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextSecondary
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Row 1: Wi-Fi, Bluetooth, Flashlight, DND
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            QuickTileItem(
+                                modifier = Modifier.weight(1f),
+                                label = "Wi-Fi",
+                                icon = Icons.Default.Wifi,
+                                isActive = true,
+                                activeColor = PrimaryBlue,
+                                onClick = { hardwareBridge.openWifiPanel(context) }
+                            )
+                            QuickTileItem(
+                                modifier = Modifier.weight(1f),
+                                label = "Bluetooth",
+                                icon = Icons.Default.Bluetooth,
+                                isActive = metrics.bluetooth_enabled,
+                                activeColor = PrimaryBlue,
+                                onClick = { hardwareBridge.openBluetoothPanel(context) }
+                            )
+                            QuickTileItem(
+                                modifier = Modifier.weight(1f),
+                                label = "Torch",
+                                icon = Icons.Default.FlashlightOn,
+                                isActive = isFlashlightActive,
+                                activeColor = WarningAmber,
+                                onClick = {
+                                    if (hasCameraPermission) {
+                                        hardwareBridge.toggleFlashlight()
+                                    } else {
+                                        cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                    }
+                                }
+                            )
+                            QuickTileItem(
+                                modifier = Modifier.weight(1f),
+                                label = "DND",
+                                icon = Icons.Default.DoNotDisturb,
+                                isActive = metrics.do_not_disturb,
+                                activeColor = DangerRed,
+                                onClick = { hardwareBridge.toggleDndMode(context) }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Row 2: Battery Saver, Default Home, Wallpaper, Settings
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            QuickTileItem(
+                                modifier = Modifier.weight(1f),
+                                label = "Battery",
+                                icon = Icons.Default.BatteryChargingFull,
+                                isActive = metrics.battery_pct < 20 || metrics.battery_saver,
+                                activeColor = SuccessGreen,
+                                onClick = { hardwareBridge.openBatterySaverSettings(context) }
+                            )
+                            QuickTileItem(
+                                modifier = Modifier.weight(1f),
+                                label = "Home App",
+                                icon = Icons.Default.Home,
+                                isActive = true,
+                                activeColor = AccentPurple,
+                                onClick = { hardwareBridge.openDefaultLauncherSelector(context) }
+                            )
+                            QuickTileItem(
+                                modifier = Modifier.weight(1f),
+                                label = "Wallpaper",
+                                icon = Icons.Default.Wallpaper,
+                                isActive = showSystemWallpaper,
+                                activeColor = PrimaryBlue,
+                                onClick = { hardwareBridge.openWallpaperPicker(context) }
+                            )
+                            QuickTileItem(
+                                modifier = Modifier.weight(1f),
+                                label = "Settings",
+                                icon = Icons.Default.Settings,
+                                isActive = false,
+                                activeColor = TextPrimary,
+                                onClick = { hardwareBridge.openSystemSettings(context) }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Display Theme Mode Card
                 Card(
@@ -1299,3 +1409,44 @@ fun GestureRowSetting(
         }
     }
 }
+
+@Composable
+fun QuickTileItem(
+    modifier: Modifier = Modifier,
+    label: String,
+    icon: ImageVector,
+    isActive: Boolean,
+    activeColor: Color,
+    onClick: () -> Unit
+) {
+    val bgColor = if (isActive) activeColor.copy(alpha = 0.22f) else CardGlassBg
+    val borderCol = if (isActive) activeColor.copy(alpha = 0.6f) else LauncherBorder
+    val iconCol = if (isActive) activeColor else TextSecondary
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(bgColor)
+            .border(1.dp, borderCol, RoundedCornerShape(14.dp))
+            .clickable { onClick() }
+            .padding(vertical = 12.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = iconCol,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+            color = if (isActive) TextPrimary else TextSecondary,
+            maxLines = 1
+        )
+    }
+}
+

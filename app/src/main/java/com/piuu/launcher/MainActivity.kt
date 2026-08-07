@@ -130,8 +130,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        com.piuu.launcher.repository.LibC.setLauncherActive(true)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        com.piuu.launcher.repository.LibC.setLauncherActive(false)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        com.piuu.launcher.repository.LibC.setLauncherActive(false)
     }
 }
 
